@@ -9,6 +9,7 @@ if ( ! defined( 'WPINC' ) ) { die; }
 function fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_groups, $is_edit_mode ) {
 ?>
 <div class="fsbhoa-form-section">
+    <!-- ROW 1; NAME row  -->
     <div class="form-row">
         <div class="form-field">
             <label for="first_name">First Name</label>
@@ -25,24 +26,27 @@ function fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_gro
         <div class="form-field">
             <label>Formal Name (from import)</label>
             <span class="readonly-field">
-                <?php 
+                <?php
                 $import_name = trim(esc_html($form_data['import_first_name'] . ' ' . $form_data['import_last_name']));
                 echo !empty($import_name) ? $import_name : 'N/A';
                 ?>
             </span>
         </div>
     </div>
+
+
+    <!-- ROW 2: Contact Info -->
     <div class="form-row">
         <div class="form-field">
             <label for="email">Email</label>
             <input type="text" name="email" id="email" value="<?php echo esc_attr($form_data['email']); ?>" pattern=".+@.+\..+" title="Please enter a valid email address (e.g., name@domain.com)" style="width: 275px; font-size: 15px; font-weight: 500; color: #2c3338;">
         </div>
         <div class="form-field fsbhoa-checkbox-field">
-                <label>
-                    <input type="checkbox" name="email_used" value="1" <?php checked($form_data['email_used'] ?? 0, 1); ?>>
-                    used
-                </label>
-            </div>
+            <label>
+                <input type="checkbox" name="email_used" value="1" <?php checked($form_data['email_used'] ?? 0, 1); ?>>
+                used
+            </label>
+        </div>
         <div class="form-field">
             <label for="phone">Phone Number</label>
             <input type="tel" name="phone" id="phone" value="<?php echo esc_attr($form_data['phone']); ?>" pattern="[0-9\s\(\)\-\.+]{10,}"  title="Please enter a valid 10-digit phone number."  style="width: 120px; font-size: 15px; font-weight: 500; color: #2c3338;">
@@ -50,7 +54,10 @@ function fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_gro
         <div class="form-field">
             <label for="phone_type">Phone Type</label>
             <select name="phone_type" id="phone_type">
-                <?php $current_phone_type = isset($form_data['phone_type']) ? $form_data['phone_type'] : 'Mobile'; ?>
+                <?php 
+                $pt = $form_data['phone_type'] ?? '';
+                $current_phone_type = (trim($pt) === '') ? 'Mobile' : trim($pt);
+                ?>
                 <option value="" <?php selected($current_phone_type, ''); ?>>-- Select --</option>
                 <option value="Mobile" <?php selected($current_phone_type, 'Mobile'); ?>>Mobile</option>
                 <option value="Landline" <?php selected($current_phone_type, 'Landline'); ?>>Landline</option>
@@ -58,25 +65,31 @@ function fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_gro
                 <option value="Other" <?php selected($current_phone_type, 'Other'); ?>>Other</option>
             </select>
         </div>
-        <div class="form-third-width">
-            <label>Permissions Groups</label>
-                <div class="checkbox-group-container">
+    </div>
+
+    <!--  ROW 3: Permission Groups  -->
+    <div class="form-row" style="padding-top: 10px; padding-bottom: 10px;">
+        <div class="form-field" style="width: 100%;">
+            <label style="margin-bottom: 8px; display: block;">Permissions Groups</label>
+            <div class="checkbox-group-container" style="display: flex; flex-wrap: wrap; gap: 25px; align-items: center;">
                 <?php if (!empty($all_groups)) : ?>
                     <?php foreach ($all_groups as $group) : ?>
-                        <label>
+                        <label style="display: flex; align-items: center; gap: 6px; font-weight: normal; margin: 0;">
                             <input type="checkbox" name="cardholder_groups[]" value="<?php echo esc_attr($group->group_id); ?>" <?php checked(in_array($group->group_id, $cardholder_groups) || (!$is_edit_mode && $group->is_default)); ?>>
                             <?php echo esc_html($group->group_name); ?>
                         </label>
                     <?php endforeach; ?>
                 <?php else :  ?>
                     <p class="description"><?php _e('No groups available.', 'fsbhoa-ac'); ?></p>
-                <?php endif; // This was the missing part that caused the error ?>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 <?php
 }
+
+
 /**
  * Validates Profile-related data from a form submission.
  *

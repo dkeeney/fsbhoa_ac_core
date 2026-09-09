@@ -169,3 +169,13 @@ tr.fsbhoa-manual-record:hover td {
   cursor: default; /* Show default cursor, not the hand/pointer */
 }
 
+/* --- Highlight Animation for Edited/Restored Records --- */
+@keyframes fsbhoaHighlightFade {
+    0%   { background-color: #d1e9ff; } /* Bright blue-ish */
+    10%  { background-color: #a3d2ff; }
+    100% { background-color: transparent; }
+}
+
+tr.fsbhoa-highlight-target td {
+    animation: fsbhoaHighlightFade 4s ease-out;
+}

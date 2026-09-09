@@ -24,6 +24,7 @@ class Fsbhoa_Ac_Settings_Page {
         add_action( 'wp_ajax_fsbhoa_generate_api_key', array( $this, 'ajax_generate_api_key' ) );
         add_action('wp_ajax_fsbhoa_save_pool_alarm', [$this, 'ajax_save_pool_alarm']);
         add_action('wp_ajax_fsbhoa_trigger_pool_alarm', [$this, 'ajax_trigger_pool_alarm']);
+        add_action( 'wp_ajax_fsbhoa_test_discord_alert', array( $this, 'ajax_test_discord_alert' ) );
     }
 
     public function add_plugin_admin_menu() {
@@ -187,6 +188,36 @@ class Fsbhoa_Ac_Settings_Page {
                 'desc'    => 'The descriptive name (e.g., "Courts") used to log amenity usage when a resident uses the After Hours Entry (West Gate) but not an inner amenity gate.'
             ]
         );
+        // Section: Discord Alert & Notification Settings
+        add_settings_section('fsbhoa_ac_alerts_section', 'Discord Alert & Notification Settings', null, $general_page_slug);
+
+        add_settings_field(
+            'fsbhoa_ac_discord_webhook_url_field',
+            'Discord Webhook URL',
+            array($this, 'render_discord_webhook_field'),
+            $general_page_slug,
+            'fsbhoa_ac_alerts_section',
+            [
+                'id'      => 'fsbhoa_ac_discord_webhook_url',
+                'type'    => 'password', // Masks the token on screen
+                'default' => '',
+                'desc'    => 'The full Webhook URL from Discord. Leave blank to disable push notifications.'
+            ]
+        );
+
+        add_settings_field(
+            'fsbhoa_ac_discord_username_field',
+            'Discord Bot Username',
+            array($this, 'render_field_callback'),
+            $general_page_slug,
+            'fsbhoa_ac_alerts_section',
+            [
+                'id'      => 'fsbhoa_ac_discord_username',
+                'type'    => 'text',
+                'default' => 'Access Control Monitor',
+                'desc'    => 'The name that will appear on the alert messages in Discord.'
+            ]
+        );
         
         // Register all General settings
         register_setting($general_option_group, 'fsbhoa_ac_photo_width', 'absint');
@@ -200,6 +231,8 @@ class Fsbhoa_Ac_Settings_Page {
         register_setting($general_option_group, 'fsbhoa_ac_rate_limit_minutes', 'absint');
         register_setting($general_option_group, 'fsbhoa_ac_amenity_clear_minutes', 'absint');
         register_setting($general_option_group, 'fsbhoa_ac_default_court_amenity_name', 'sanitize_text_field');
+        register_setting($general_option_group, 'fsbhoa_ac_discord_webhook_url', 'sanitize_text_field');
+        register_setting($general_option_group, 'fsbhoa_ac_discord_username', 'sanitize_text_field');
 
 
 
@@ -243,6 +276,50 @@ class Fsbhoa_Ac_Settings_Page {
                 <span id="fsbhoa-save-feedback" style="display: none; margin-left: 10px; vertical-align: middle;"></span>
             </p>
         </div>
+        <?php
+    }
+
+    public function render_discord_webhook_field($args) {
+        $id    = $args['id'];
+        $value = get_option($id, '');
+        $desc  = $args['desc'] ?? '';
+        ?>
+        <input type="password" name="<?php echo esc_attr($id); ?>" id="<?php echo esc_attr($id); ?>" value="<?php echo esc_attr($value); ?>" class="regular-text" />
+        <button type="button" class="button" id="btn-test-discord">Test Webhook</button>
+        <span id="discord-test-feedback" style="margin-left: 10px; font-weight: bold;"></span>
+        <p class="description">
+            <?php echo esc_html($desc); ?><br>
+            <em>Note: If you just pasted a new URL, click "Save General Settings" at the bottom of the page before testing.</em>
+        </p>
+        <script>
+        jQuery(document).ready(function($) {
+            $('#btn-test-discord').on('click', function(e) {
+                e.preventDefault();
+                var feedback = $('#discord-test-feedback');
+                var btn = $(this);
+
+                btn.prop('disabled', true);
+                feedback.text('Sending...').css('color', '#000');
+
+                $.post(ajaxurl, {
+                    action: 'fsbhoa_test_discord_alert',
+                    nonce: fsbhoa_settings_vars.general_nonce
+                }, function(response) {
+                    btn.prop('disabled', false);
+                    if (response.success) {
+                        feedback.text(response.data).css('color', 'green');
+                    } else {
+                        feedback.text('Error: ' + response.data).css('color', 'red');
+                    }
+                    setTimeout(function() { feedback.text(''); }, 5000);
+                }).fail(function() {
+                    btn.prop('disabled', false);
+                    feedback.text('AJAX request failed.').css('color', 'red');
+                    setTimeout(function() { feedback.text(''); }, 5000);
+                });
+            });
+        });
+        </script>
         <?php
     }
 
@@ -772,6 +849,21 @@ class Fsbhoa_Ac_Settings_Page {
             wp_send_json_success('Successfully triggered ' . esc_html($action) . ' command (Status: ' . $status_code . ')');
         } else {
             wp_send_json_error('Received HTTP ' . $status_code . ' from alarm system.');
+        }
+    }
+
+    public function ajax_test_discord_alert() {
+        check_ajax_referer('fsbhoa_general_settings_nonce', 'nonce');
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permission denied.', 403);
+        }
+
+        if ( function_exists('fsbhoa_send_discord_alert') ) {
+            // Note: We recommend users click 'Save General Settings' first if they just pasted a new URL
+            fsbhoa_send_discord_alert("✅ **Test Successful:** The FSBHOA Access Control webhook is communicating perfectly!");
+            wp_send_json_success('Test alert sent to Discord.');
+        } else {
+            wp_send_json_error('Alert function not found.');
         }
     }
 }

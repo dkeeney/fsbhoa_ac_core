@@ -36,10 +36,16 @@ class Fsbhoa_Archived_Cardholder_Admin_Page {
             // Display feedback messages from redirects
             if ( $message_code === 'cardholder_restored' ) {
                 echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Cardholder restored successfully.', 'fsbhoa-ac' ) . '</p></div>';
+            } elseif ( $message_code === 'bulk_restored' ) {
+                $count = isset($_GET['processed_count']) ? absint($_GET['processed_count']) : 0;
+                printf( '<div class="notice notice-success is-dismissible"><p>' . esc_html__('%d cardholder(s) restored successfully.', 'fsbhoa-ac') . '</p></div>', $count );
             } elseif ( $message_code === 'merge_success' ) {
                 echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Cardholder merged successfully. The source record has been purged.', 'fsbhoa-ac' ) . '</p></div>';
             } elseif ( $message_code === 'cardholder_purged' ) {
                 echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Cardholder purged. The record is now hidden but retained for historical reporting.', 'fsbhoa-ac' ) . '</p></div>';
+            } elseif ( $message_code === 'bulk_purged' ) {
+                $count = isset($_GET['processed_count']) ? absint($_GET['processed_count']) : 0;
+                printf( '<div class="notice notice-success is-dismissible"><p>' . esc_html__('%d cardholder(s) purged.', 'fsbhoa-ac') . '</p></div>', $count );
             }
             ?>
 

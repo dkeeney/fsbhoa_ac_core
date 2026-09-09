@@ -9,402 +9,370 @@
  */
 
 if ( ! defined( 'WPINC' ) ) {
-    die;
+	die;
 }
 
 class Fsbhoa_Archived_Cardholder_Actions {
 
-    public function __construct() {
-        add_action( 'admin_post_fsbhoa_restore_archived_cardholder', [ $this, 'handle_restore_action' ] );
-        add_action( 'admin_post_fsbhoa_purge_archived_cardholder', [ $this, 'handle_purge_action' ] );
-        add_action( 'admin_post_fsbhoa_confirm_merge', [ $this, 'handle_confirm_merge_action' ] );
-        add_action( 'admin_post_fsbhoa_update_archived_notes', [ $this, 'handle_update_archived_notes_action' ] );
-        add_action('wp_ajax_fsbhoa_update_archived_notes', [$this, 'ajax_update_archived_notes']);
-    }
+	public function __construct() {
+		add_action( 'admin_post_fsbhoa_restore_archived_cardholder', [ $this, 'handle_restore_action' ] );
+		add_action( 'admin_post_fsbhoa_purge_archived_cardholder', [ $this, 'handle_purge_action' ] );
+		add_action( 'admin_post_fsbhoa_confirm_merge', [ $this, 'handle_confirm_merge_action' ] );
+		add_action( 'admin_post_fsbhoa_update_archived_notes', [ $this, 'handle_update_archived_notes_action' ] );
+		add_action( 'wp_ajax_fsbhoa_update_archived_notes', [ $this, 'ajax_update_archived_notes' ] );
+		add_action( 'admin_post_fsbhoa_bulk_archived_action', [ $this, 'handle_bulk_archived_action' ] );
+		add_action( 'wp_ajax_fsbhoa_ajax_purge_cardholder', [ $this, 'ajax_purge_cardholder_callback' ] );
+	}
 
-    /**
-     * Handles restoring an archived cardholder back to 'inactive' status.
-     * NOW WRAPPED IN A TRANSACTION FOR DATA INTEGRITY.
-     */
-    public function handle_restore_action() {
-        global $wpdb;
+	/**
+	 * Handles restoring an archived cardholder back to 'inactive' status.
+	 * NOW WRAPPED IN A TRANSACTION FOR DATA INTEGRITY.
+	 */
+	public function handle_restore_action() {
+		global $wpdb;
 
-        $cardholder_id = isset( $_GET['cardholder_id'] ) ? absint( $_GET['cardholder_id'] ) : 0;
-        if ( ! $cardholder_id ) {
-            wp_die( 'Invalid cardholder ID specified.', 'Error', ['back_link' => true] );
-        }
-        check_admin_referer( 'fsbhoa_restore_archived_cardholder_' . $cardholder_id );
+		$cardholder_id = isset( $_GET['cardholder_id'] ) ? absint( $_GET['cardholder_id'] ) : 0;
+		if ( ! $cardholder_id ) {
+			wp_die( 'Invalid cardholder ID specified.', 'Error', [ 'back_link' => true ] );
+		}
+		check_admin_referer( 'fsbhoa_restore_archived_cardholder_' . $cardholder_id );
 
-        // --- START TRANSACTION ---
-        $wpdb->query( 'START TRANSACTION' );
+		// --- START TRANSACTION ---
+		$wpdb->query( 'START TRANSACTION' );
 
-        $table_cardholders = 'ac_cardholders';
+		$table_cardholders = 'ac_cardholders';
 
-        $source_record = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table_cardholders} WHERE id = %d FOR UPDATE", $cardholder_id ) );
+		$source_record = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table_cardholders} WHERE id = %d FOR UPDATE", $cardholder_id ) );
 
-        // DB ERROR CHECK
-        if ( $wpdb->last_error ) {
-            $wpdb->query( 'ROLLBACK' );
-            wp_die( 'Database error while fetching archived data. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', ['back_link' => true] );
-        }
+		// DB ERROR CHECK
+		if ( $wpdb->last_error ) {
+			$wpdb->query( 'ROLLBACK' );
+			wp_die( 'Database error while fetching archived data. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
+		}
 
-        $groups_csv = $source_record->groups_csv;
+		$groups_csv = $source_record->groups_csv;
 
-        $has_credential = $wpdb->get_var($wpdb->prepare(
-            "SELECT credential_id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1",
-            $cardholder_id
-        ));
-        $new_status = $has_credential ? 'active' : 'inactive';
+		$has_credential = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1",
+			$cardholder_id
+		) );
+		$new_status = $has_credential ? 'active' : 'inactive';
 
-        $result = $wpdb->update(
-            $table_cardholders,
-            [
-                'cardholder_status' => $new_status,
-                'deleted_at'  => null,
-                'groups_csv'  => null
-            ],
-            [ 'id' => $cardholder_id ],
-            [ '%s', null, null ],
-            [ '%d' ]
-        );
+		$result = $wpdb->update(
+			$table_cardholders,
+			[
+				'cardholder_status' => $new_status,
+				'deleted_at'        => null,
+				'groups_csv'        => null
+			],
+			[ 'id' => $cardholder_id ],
+			[ '%s', null, null ],
+			[ '%d' ]
+		);
 
-        // DB ERROR CHECK
-        if ( false === $result ) {
-            $wpdb->query( 'ROLLBACK' );
-            wp_die( 'Database error while updating cardholder status during restore. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', ['back_link' => true] );
-        }
+		// DB ERROR CHECK
+		if ( false === $result ) {
+			$wpdb->query( 'ROLLBACK' );
+			wp_die( 'Database error while updating cardholder status during restore. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
+		}
 
-        if ( ! empty( $groups_csv ) ) {
-            $table_memberships = 'ac_cardholder_groups';
-            $wpdb->delete($table_memberships, ['cardholder_id' => $cardholder_id]);
+		if ( ! empty( $groups_csv ) ) {
+			$table_memberships = 'ac_cardholder_groups';
+			$wpdb->delete( $table_memberships, [ 'cardholder_id' => $cardholder_id ] );
 
-            // DB ERROR CHECK
-            if ( $wpdb->last_error ) {
-                $wpdb->query( 'ROLLBACK' );
-                wp_die( 'Database error while clearing old group memberships. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', ['back_link' => true] );
-            }
+			// DB ERROR CHECK
+			if ( $wpdb->last_error ) {
+				$wpdb->query( 'ROLLBACK' );
+				wp_die( 'Database error while clearing old group memberships. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
+			}
 
-            $group_ids_to_restore = explode( ',', $groups_csv );
-            foreach ( $group_ids_to_restore as $group_id ) {
-                $group_id = absint( $group_id );
-                if ( $group_id > 0 ) {
-                    $inserted = $wpdb->insert( $table_memberships, [ 'cardholder_id' => $cardholder_id, 'group_id' => $group_id ], [ '%d', '%d' ] );
-                    // DB ERROR CHECK
-                    if ( false === $inserted ) {
-                        $wpdb->query( 'ROLLBACK' );
-                        wp_die( 'Database error while restoring group memberships. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', ['back_link' => true] );
-                    }
-                }
-            }
-        }
-        // --- Reactivate all credentials upon restore ---
-        $wpdb->update('ac_credentials', ['status' => 'active'], ['cardholder_id' => $cardholder_id], ['%s'], ['%d']);
-        
-        // --- COMMIT TRANSACTION ---
-        $wpdb->query( 'COMMIT' );
-        fsbhoa_log_pending_change('cardholder', $cardholder_id);
+			$group_ids_to_restore = explode( ',', $groups_csv );
+			foreach ( $group_ids_to_restore as $group_id ) {
+				$group_id = absint( $group_id );
+				if ( $group_id > 0 ) {
+					$inserted = $wpdb->insert( $table_memberships, [ 'cardholder_id' => $cardholder_id, 'group_id' => $group_id ], [ '%d', '%d' ] );
+					// DB ERROR CHECK
+					if ( false === $inserted ) {
+						$wpdb->query( 'ROLLBACK' );
+						wp_die( 'Database error while restoring group memberships. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
+					}
+				}
+			}
+		}
+		// --- Reactivate all credentials upon restore ---
+		$wpdb->update( 'ac_credentials', [ 'status' => 'active' ], [ 'cardholder_id' => $cardholder_id ], [ '%s' ], [ '%d' ] );
 
-        $redirect_url = remove_query_arg( [ 'action', 'cardholder_id', '_wpnonce' ], wp_get_referer() );
-        $redirect_url = add_query_arg( 'message', 'cardholder_restored', $redirect_url );
-        wp_safe_redirect( $redirect_url );
-        exit;
-    }
+		// --- COMMIT TRANSACTION ---
+		$wpdb->query( 'COMMIT' );
+		fsbhoa_log_pending_change( 'cardholder', $cardholder_id );
 
-    /**
-     * Handles "purging" a cardholder. This sets their status to 'purged',
-     * hiding them from the UI but keeping them for historical reports.
-     */
-    public function handle_purge_action() {
-        global $wpdb;
-        $cardholder_id = isset( $_GET['cardholder_id'] ) ? absint( $_GET['cardholder_id'] ) : 0;
-        if ( ! $cardholder_id ) {
-            wp_die( 'Invalid cardholder ID specified.', 'Error', ['back_link' => true] );
-        }
-        check_admin_referer('fsbhoa_purge_cardholder_' . $cardholder_id);
+		// Get the actual URL of the Live Cardholders page
+		$page_object  = get_page_by_path( 'cardholder' );
+		$redirect_url = $page_object ? get_permalink( $page_object->ID ) : home_url( '/' );
 
-        $result = $wpdb->update(
-            'ac_cardholders',
-            [ 'cardholder_status' => 'purged' ],
-            [ 'id' => $cardholder_id ],
-            [ '%s' ],
-            [ '%d' ]
-        );
+		$redirect_url = add_query_arg( [ 'message' => 'cardholder_restored', 'highlight' => $cardholder_id ], $redirect_url );
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
 
-        // DB ERROR CHECK
-        if ( false === $result ) {
-            wp_die( 'Database error while purging the cardholder. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', ['back_link' => true] );
-        }
+	/**
+	 * Handles "purging" a cardholder. This sets their status to 'purged',
+	 * removes credentials to free badge IDs, and keeps the cardholder row for historical logs.
+	 */
+	public function handle_purge_action() {
+		global $wpdb;
+		$cardholder_id = isset( $_GET['cardholder_id'] ) ? absint( $_GET['cardholder_id'] ) : 0;
+		if ( ! $cardholder_id ) {
+			wp_die( 'Invalid cardholder ID specified.', 'Error', [ 'back_link' => true ] );
+		}
+		check_admin_referer( 'fsbhoa_purge_cardholder_' . $cardholder_id );
 
-        $redirect_url = remove_query_arg( [ 'action', 'cardholder_id', '_wpnonce' ], wp_get_referer() );
-        $redirect_url = add_query_arg( 'message', 'cardholder_purged', $redirect_url );
-        wp_safe_redirect( $redirect_url );
-        exit;
-    }
+		$result = $wpdb->update(
+			'ac_cardholders',
+			[ 'cardholder_status' => 'purged' ],
+			[ 'id' => $cardholder_id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
 
-    /**
-     * Handles the final merge action.
-     * REFACTORED to use prepared statements for all database writes, ensuring
-     * that binary photo data is handled safely and correctly.
-     */
-    public function handle_confirm_merge_action() {
-        global $wpdb;
-        check_admin_referer('fsbhoa_confirm_merge_nonce');
-        if ( ! current_user_can('manage_options') ) {
-            wp_die('You do not have permission to merge cardholders.');
-        }
+		// DB ERROR CHECK
+		if ( false === $result ) {
+			wp_die( 'Database error while purging the cardholder. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
+		}
 
-        $source_id = isset($_POST['source_cardholder_id']) ? absint($_POST['source_cardholder_id']) : 0;
-        $destination_id = isset($_POST['destination_cardholder_id']) ? absint($_POST['destination_cardholder_id']) : 0;
-        error_log("[MERGE ACTION START] Initiating merge from Source ID: {$source_id} to Destination ID: {$destination_id}");
+		// Clean out associated credentials so strings/badges are not orphaned or blocking unique checks
+		$wpdb->delete( 'ac_credentials', [ 'cardholder_id' => $cardholder_id ], [ '%d' ] );
 
-        if ( ! $source_id || ! $destination_id || $source_id === $destination_id) {
-            error_log("[MERGE ACTION ERROR] Invalid source or destination ID. Aborting.");
-            wp_die( 'Invalid source or destination cardholder ID specified.', 'Error', ['back_link' => true] );
-        }
+		$redirect_url = remove_query_arg( [ 'action', 'cardholder_id', '_wpnonce' ], wp_get_referer() );
+		$redirect_url = add_query_arg( 'message', 'cardholder_purged', $redirect_url );
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
 
-        $wpdb->query( 'START TRANSACTION' );
-        error_log("[MERGE ACTION DB] Transaction started.");
+	public function ajax_purge_cardholder_callback() {
+		check_ajax_referer( 'fsbhoa_property_search_nonce', 'security' );
 
-        $table_cardholders = 'ac_cardholders';
-        $table_access_log = 'ac_access_log';
-        $table_properties = 'ac_property';
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Permission denied.' );
+		}
 
-        $source_record = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table_cardholders} WHERE id = %d AND cardholder_status = 'archived' FOR UPDATE", $source_id ), ARRAY_A );
-        if ( ! $source_record ) {
-            error_log("[MERGE ACTION ERROR] Could not find or lock source record ID: {$source_id}. Rolling back.");
-            $wpdb->query( 'ROLLBACK' );
-            wp_die( 'Could not find or lock the archived source record to merge.', 'Error', ['back_link' => true] );
-        }
+		$cardholder_id = isset( $_POST['cardholder_id'] ) ? absint( $_POST['cardholder_id'] ) : 0;
 
-        // ---  Fetch Destination to compare ---
-        $dest_record = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table_cardholders} WHERE id = %d FOR UPDATE", $destination_id ), ARRAY_A );
-        if ( ! $dest_record ) {
-            error_log("[MERGE ACTION ERROR] Could not find or lock destination record ID: {$destination_id}. Rolling back.");
-            $wpdb->query( 'ROLLBACK' );
-            wp_die( 'Could not find or lock the destination record to merge into.', 'Error', ['back_link' => true] );
-        }
+		if ( ! $cardholder_id ) {
+			wp_send_json_error( 'Invalid cardholder ID specified for purge.' );
+		}
 
-        // --- LOGIC: Move credentials from source to destination ---
-        // Grab the credential_value as well so we can check for exact duplicates
-        $source_creds = $wpdb->get_results($wpdb->prepare("SELECT credential_id, credential_type, credential_value FROM ac_credentials WHERE cardholder_id = %d", $source_id));
+		global $wpdb;
 
-        foreach ($source_creds as $cred) {
-            // Does the Destination already have this EXACT credential?
-            $dest_has_exact_cred = $wpdb->get_var($wpdb->prepare(
-                "SELECT credential_id FROM ac_credentials WHERE cardholder_id = %d AND credential_type = %s AND credential_value = %s LIMIT 1",
-                $destination_id, $cred->credential_type, $cred->credential_value
-            ));
+		$result = $wpdb->update(
+			'ac_cardholders',
+			[ 'cardholder_status' => 'purged' ],
+			[ 'id' => $cardholder_id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
 
-            if (!$dest_has_exact_cred) {
-                // Safely move AND activate this specific credential for the Destination
-                $wpdb->update(
-                    'ac_credentials',
-                    ['cardholder_id' => $destination_id, 'status' => 'active'],
-                    ['credential_id' => $cred->credential_id],
-                    ['%d', '%s'],
-                    ['%d']
-                );
-            }
-        }
+		if ( false === $result ) {
+			wp_send_json_error( 'Database error while purging the cardholder. DB Error: ' . esc_html( $wpdb->last_error ) );
+		}
 
-        // If Destination has a Photo, keep it. Otherwise, take the one from Source.
-        $final_photo = !empty($dest_record['photo']) ? $dest_record['photo'] : $source_record['photo'];
+		// Clean out associated credentials so strings/badges are not orphaned or blocking unique checks
+		$wpdb->delete( 'ac_credentials', [ 'cardholder_id' => $cardholder_id ], [ '%d' ] );
 
-        // --- LOGIC: Auto-Activate ---
-        $has_any_cred = $wpdb->get_var($wpdb->prepare("SELECT credential_id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1", $destination_id));
-        $new_status = $has_any_cred ? 'active' : 'inactive';
+		// Log the change for hardware sync tracking
+		if ( function_exists( 'fsbhoa_log_pending_change' ) ) {
+			fsbhoa_log_pending_change( 'cardholder', $cardholder_id, json_encode( [ 'action' => 'purged_record' ] ) );
+		}
 
-        error_log("[MERGE LOGIC] Resulting Status: $new_status");
-    
-        // If Destination has a Photo, keep it. Otherwise, take the one from Source.
-        $final_photo = !empty($dest_record['photo']) ? $dest_record['photo'] : $source_record['photo'];
+		wp_send_json_success( 'Cardholder purged successfully.' );
+	}
 
-        // --- LOGIC: Auto-Activate ---
-        // Auto-activate if the destination now has a credential
-        $has_cred = $wpdb->get_var($wpdb->prepare("SELECT credential_id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1", $destination_id));
-        $new_status = $has_cred ? 'active' : 'inactive';
+	/**
+	 * Handles the final merge action.
+	 * REFACTORED to use prepared statements for all database writes, ensuring
+	 * that binary photo data is handled safely and correctly.
+	 */
+	public function handle_confirm_merge_action() {
+		check_admin_referer( 'fsbhoa_confirm_merge_nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'You do not have permission to merge cardholders.' );
+		}
 
-        error_log("[MERGE LOGIC] Resulting RFID: $final_rfid | Resulting Status: $new_status");
+		$source_id      = isset( $_POST['source_cardholder_id'] ) ? absint( $_POST['source_cardholder_id'] ) : 0;
+		$destination_id = isset( $_POST['destination_cardholder_id'] ) ? absint( $_POST['destination_cardholder_id'] ) : 0;
 
+		$result = fsbhoa_merge_cardholders( $destination_id, $source_id );
 
-        // Get the property ID from the source record before we do anything else.
-        $manual_property_id = !empty($source_record['property_id']) ? absint($source_record['property_id']) : 0;
-        error_log("[MERGE ACTION INFO] Source record property ID is: {$manual_property_id}");
+		if ( is_wp_error( $result ) ) {
+			wp_die( $result->get_error_message(), 'Error', [ 'back_link' => true ] );
+		}
 
+		$page_object  = get_page_by_path( 'cardholder' );
+		$redirect_url = $page_object ? get_permalink( $page_object->ID) : home_url( '/' );
+		$redirect_url = add_query_arg( [ 'message' => 'merge_success', 'highlight' => $destination_id ], $redirect_url );
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
 
-        // --- STEP 1: Update all simple text/numeric data using a prepared statement. ---
-        $new_status = 
-        $text_sql = $wpdb->prepare(
-            "UPDATE {$table_cardholders} SET
-                first_name = %s, last_name = %s, title = %s,
-                email = %s, email_used = %d, phone = %s, phone_type = %s,
-                cardholder_status = %s, notes = %s, resident_type = %s
-            WHERE id = %d",
-            $source_record['first_name'], 
-            $source_record['last_name'], 
-            $source_record['title'],
-            $source_record['email'], 
-            $source_record['email_used'], 
-            $source_record['phone'], 
-            $source_record['phone_type'],
-            $new_status,
-            $source_record['notes'], 
-            $source_record['resident_type'],
-            $destination_id
-        );
-        $updated_text = $wpdb->query($text_sql);
-        if ( false === $updated_text ) {
-            error_log("[MERGE ACTION ERROR] DB error merging text data: " . $wpdb->last_error . ". Rolling back.");
-            $wpdb->query( 'ROLLBACK' );
-            wp_die( 'Database error while merging text data. DB Error: ' . esc_html($wpdb->last_error), 'Error', ['back_link' => true] );
-        }
-        error_log("[MERGE ACTION DB] Step 1: Merged text data. Rows affected: " . $updated_text);
+	/**
+	 * Handles updating the notes for a single archived cardholder.
+	 */
+	public function handle_update_archived_notes_action() {
+		global $wpdb;
 
-        // --- STEP 2: Update the binary photo data in a separate, dedicated prepared statement. ---
-        if (!empty($source_record['photo'])) {
-            $photo_sql = $wpdb->prepare(
-                "UPDATE {$table_cardholders} SET photo = %s WHERE id = %d",
-                $final_photo,
-                $destination_id
-            );
-            $updated_photo = $wpdb->query($photo_sql);
-            if ( false === $updated_photo ) {
-                error_log("[MERGE ACTION ERROR] DB error merging photo data: " . $wpdb->last_error . ". Rolling back.");
-                $wpdb->query( 'ROLLBACK' );
-                wp_die( 'Database error while merging the photo data. DB Error: ' . esc_html($wpdb->last_error), 'Error', ['back_link' => true] );
-            }
-            error_log("[MERGE ACTION DB] Step 2: Merged photo data. Rows affected: " . $updated_photo);
-        }
+		// Security and permission checks
+		if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'fsbhoa_update_archived_notes_nonce' ) ) {
+			wp_die( 'Security check failed.', 'Error', [ 'back_link' => true ] );
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'You do not have permission to perform this action.', 'Error', [ 'back_link' => true ] );
+		}
 
-        // --- STEP 3: Re-link historical access logs. ---
-        $relinked = $wpdb->update( $table_access_log, ['cardholder_id' => $destination_id], ['cardholder_id' => $source_id], ['%d'], ['%d'] );
-        if ( false === $relinked ) {
-            error_log("[MERGE ACTION ERROR] DB error re-linking access logs: " . $wpdb->last_error . ". Rolling back.");
-            $wpdb->query( 'ROLLBACK' );
-            wp_die( 'Database error while re-linking access logs. DB Error: ' . esc_html($wpdb->last_error), 'Error', ['back_link' => true] );
-        }
-        error_log("[MERGE ACTION DB] Step 3: Relinked access logs. Rows affected: " . $relinked);
+		$cardholder_id = isset( $_POST['cardholder_id'] ) ? absint( $_POST['cardholder_id'] ) : 0;
+		if ( ! $cardholder_id ) {
+			wp_die( 'Invalid cardholder ID.', 'Error', [ 'back_link' => true ] );
+		}
 
-        // --- STEP 4: Purge the now-merged source record. ---
-        $purged = $wpdb->update( $table_cardholders, ['cardholder_status' => 'purged'], ['id' => $source_id], ['%s'], ['%d'] );
-        if ( false === $purged ) {
-            error_log("[MERGE ACTION ERROR] DB error purging source record: " . $wpdb->last_error . ". Rolling back.");
-            $wpdb->query( 'ROLLBACK' );
-            wp_die( 'Database error while purging the source record. DB Error: ' . esc_html($wpdb->last_error), 'Error', ['back_link' => true] );
-        }
-        error_log("[MERGE ACTION DB] Step 4: Purged source record. Rows affected: " . $purged);
+		// Sanitize and update the notes
+		$notes  = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
+		$result = $wpdb->update(
+			'ac_cardholders',
+			[ 'notes' => $notes ],
+			[ 'id' => $cardholder_id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
 
-        // --- STEP 5: Clean up the orphaned property. ---
-        if ( $manual_property_id > 0 ) {
-            // Check the origin of the property
-            $property_origin = $wpdb->get_var( $wpdb->prepare( "SELECT origin FROM {$table_properties} WHERE property_id = %d", $manual_property_id ) );
+		if ( $result === false ) {
+			wp_die( 'Database error while updating notes.', 'Error', [ 'back_link' => true ] );
+		}
 
-            // Only proceed if the property was manually created
-            if ( $property_origin === 'manual' ) {
-                // Count how many cardholders are still linked to this property
-                $remaining_cardholders = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table_cardholders} WHERE property_id = %d", $manual_property_id ) );
-                error_log("[MERGE ACTION INFO] Checking manual property ID {$manual_property_id}. Found {$remaining_cardholders} remaining cardholders.");
+		// Redirect back to the preview page with a success message
+		$redirect_url = wp_get_referer();
+		$redirect_url = add_query_arg( 'message', 'notes_updated', $redirect_url );
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
 
-                // If the property is now empty, delete it
-                if ( $remaining_cardholders == 0 ) {
-                    $deleted_property = $wpdb->delete( $table_properties, ['property_id' => $manual_property_id], ['%d'] );
-                    
-                    if ( false === $deleted_property ) {
-                        error_log("[MERGE ACTION ERROR] DB error deleting orphaned property: " . $wpdb->last_error . ". Rolling back.");
-                        $wpdb->query( 'ROLLBACK' );
-                        wp_die( 'Database error while deleting orphaned manual property. DB Error: ' . esc_html($wpdb->last_error), 'Error', ['back_link' => true] );
-                    }
-                    error_log("[MERGE ACTION DB] Step 5: Deleted orphaned manual property ID {$manual_property_id}. Rows affected: " . $deleted_property);
-                }
-            }
-        }
+	public function ajax_update_archived_notes() {
+		check_ajax_referer( 'fsbhoa_archived_notes_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Permission denied.', 403 );
+		}
 
-        $wpdb->query( 'COMMIT' );
+		$cardholder_id = isset( $_POST['cardholder_id'] ) ? absint( $_POST['cardholder_id'] ) : 0;
+		if ( ! $cardholder_id ) {
+			wp_send_json_error( 'Invalid cardholder ID.' );
+		}
 
-        // NOTE: if both source and destination had non-null but different rfid's then we 
-        //       use the one from the destination.  Otherwise we would need to add code
-        //       to remove the overwitten active rfid on the destination.
-        if ($new_status == 'active') {
-            fsbhoa_log_pending_change('cardholder', $destination_id);
-        }
+		global $wpdb;
+		$notes  = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
+		$result = $wpdb->update(
+			'ac_cardholders',
+			[ 'notes' => $notes ],
+			[ 'id' => $cardholder_id ],
+			[ '%s' ], [ '%d' ]
+		);
 
-        error_log("[MERGE ACTION END] Commit successful. Redirecting.");
+		if ( $result === false ) {
+			wp_send_json_error( 'Database error updating notes: ' . $wpdb->last_error );
+		}
 
-        $redirect_url = get_permalink(get_page_by_path('archived-cardholders'));
-        if (!$redirect_url) {
-             wp_die('Configuration Error: The page slug "archived-cardholders" was not found.', 'Error', ['back_link' => true]);
-        }
-        $redirect_url = add_query_arg( 'message', 'merge_success', $redirect_url );
-        wp_safe_redirect( $redirect_url );
-        exit;
-    }
+		wp_send_json_success( 'Notes updated successfully.' );
+	}
 
-    /**
-     * Handles updating the notes for a single archived cardholder.
-     */
-    public function handle_update_archived_notes_action() {
-        global $wpdb;
+	/**
+	 * Handles bulk restoring or purging of archived cardholders.
+	 */
+	public function handle_bulk_archived_action() {
+		if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'fsbhoa_bulk_archived_nonce' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'fsbhoa-ac' ) );
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Permission denied.' );
+		}
 
-        // Security and permission checks
-        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'fsbhoa_update_archived_notes_nonce')) {
-            wp_die('Security check failed.', 'Error', ['back_link' => true]);
-        }
-        if (!current_user_can('manage_options')) {
-            wp_die('You do not have permission to perform this action.', 'Error', ['back_link' => true]);
-        }
+		$bulk_action = isset( $_POST['bulk_action'] ) ? sanitize_text_field( wp_unslash( $_POST['bulk_action'] ) ) : '-1';
 
-        $cardholder_id = isset($_POST['cardholder_id']) ? absint($_POST['cardholder_id']) : 0;
-        if (!$cardholder_id) {
-            wp_die('Invalid cardholder ID.', 'Error', ['back_link' => true]);
-        }
+		if ( $bulk_action === '-1' || empty( $_POST['cardholder_ids'] ) || ! is_array( $_POST['cardholder_ids'] ) ) {
+			wp_safe_redirect( wp_get_referer() );
+			exit;
+		}
 
-        // Sanitize and update the notes
-        $notes = isset($_POST['notes']) ? sanitize_textarea_field(wp_unslash($_POST['notes'])) : '';
-        $result = $wpdb->update(
-            'ac_cardholders',
-            ['notes' => $notes],
-            ['id' => $cardholder_id],
-            ['%s'],
-            ['%d']
-        );
+		global $wpdb;
+		$cardholder_ids  = array_map( 'absint', $_POST['cardholder_ids'] );
+		$processed_count = 0;
 
-        if ($result === false) {
-            wp_die('Database error while updating notes.', 'Error', ['back_link' => true]);
-        }
-        
-        // Redirect back to the preview page with a success message
-        $redirect_url = wp_get_referer();
-        $redirect_url = add_query_arg('message', 'notes_updated', $redirect_url);
-        wp_safe_redirect($redirect_url);
-        exit;
-    }
+		if ( $bulk_action === 'purge' ) {
+			// Bulk Purge: Update status to 'purged' for all selected IDs
+			$ids_string = implode( ',', $cardholder_ids );
+			$sql = "UPDATE ac_cardholders SET cardholder_status = 'purged' WHERE id IN ($ids_string)";
+			$result = $wpdb->query( $sql );
+			if ( $result !== false ) {
+				$processed_count = count( $cardholder_ids );
+				// Clean out credentials for all purged records
+				$wpdb->query( "DELETE FROM ac_credentials WHERE cardholder_id IN ($ids_string)" );
+			}
+		} elseif ( $bulk_action === 'restore' ) {
+			// Bulk Restore: Wrap all restores in a single database transaction
+			$wpdb->query( 'START TRANSACTION' );
+			$error_occurred = false;
 
+			foreach ( $cardholder_ids as $cardholder_id ) {
+				$source_record = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM ac_cardholders WHERE id = %d FOR UPDATE", $cardholder_id ) );
+				if ( ! $source_record ) continue;
 
-    public function ajax_update_archived_notes() {
-        check_ajax_referer('fsbhoa_archived_notes_nonce', 'nonce');
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error('Permission denied.', 403);
-        }
+				$groups_csv     = $source_record->groups_csv;
+				$has_credential = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1", $cardholder_id ) );
+				$new_status     = $has_credential ? 'active' : 'inactive';
 
-        $cardholder_id = isset($_POST['cardholder_id']) ? absint($_POST['cardholder_id']) : 0;
-        if (!$cardholder_id) {
-            wp_send_json_error('Invalid cardholder ID.');
-        }
+				$wpdb->update( 'ac_cardholders', [ 'cardholder_status' => $new_status, 'deleted_at' => null, 'groups_csv' => null ], [ 'id' => $cardholder_id ], [ '%s', null, null ], [ '%d' ] );
 
-        global $wpdb;
-        $notes = isset($_POST['notes']) ? sanitize_textarea_field(wp_unslash($_POST['notes'])) : '';
-        $result = $wpdb->update(
-            'ac_cardholders',
-            ['notes' => $notes],
-            ['id' => $cardholder_id],
-            ['%s'], ['%d']
-        );
+				if ( ! empty( $groups_csv ) ) {
+					$wpdb->delete( 'ac_cardholder_groups', [ 'cardholder_id' => $cardholder_id ] );
+					$group_ids = explode( ',', $groups_csv );
+					foreach ( $group_ids as $gid ) {
+						$gid = absint( $gid );
+						if ( $gid > 0 ) {
+							$wpdb->insert( 'ac_cardholder_groups', [ 'cardholder_id' => $cardholder_id, 'group_id' => $gid ], [ '%d', '%d' ] );
+						}
+					}
+				}
+				$wpdb->update( 'ac_credentials', [ 'status' => 'active' ], [ 'cardholder_id' => $cardholder_id ], [ '%s' ], [ '%d' ] );
 
-        if ($result === false) {
-            wp_send_json_error('Database error updating notes: ' . $wpdb->last_error);
-        }
+				fsbhoa_log_pending_change( 'cardholder', $cardholder_id, json_encode( [ 'action' => 'bulk_restore' ] ) );
+				$processed_count++;
+			}
 
-        wp_send_json_success('Notes updated successfully.');
-    }
+			if ( $error_occurred ) {
+				$wpdb->query( 'ROLLBACK' );
+				wp_die( 'Error processing bulk restore.', 'Error', [ 'back_link' => true ] );
+			} else {
+				$wpdb->query( 'COMMIT' );
+			}
+		}
+
+		if ( $bulk_action === 'restore' && $processed_count > 0 ) {
+			// Redirect to Live Cardholders and highlight the first restored ID
+			$page_object  = get_page_by_path( 'cardholder' );
+			$redirect_url = $page_object ? get_permalink( $page_object->ID ) : home_url( '/' );
+			$highlight_id = $cardholder_ids[0]; // Grab the first one to highlight
+
+			$redirect_url = add_query_arg( [ 'message' => 'bulk_restored', 'processed_count' => $processed_count, 'highlight' => $highlight_id ], $redirect_url );
+			wp_safe_redirect( $redirect_url );
+			exit;
+
+		} elseif ( $bulk_action === 'purge' && $processed_count > 0 ) {
+			// Stay on the Archive page for purge
+			$redirect_url = remove_query_arg( [ 'action', 'cardholder_id', '_wpnonce', 'message', 'processed_count' ], wp_get_referer() );
+			$redirect_url = add_query_arg( [ 'message' => 'bulk_purged', 'processed_count' => $processed_count ], $redirect_url );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		wp_safe_redirect( wp_get_referer() );
+		exit;
+	}
 
 }
+

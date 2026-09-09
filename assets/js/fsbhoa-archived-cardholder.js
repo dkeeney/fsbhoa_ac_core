@@ -9,16 +9,74 @@ jQuery(function($) {
         if (archivedTableElement.length) {
             var archivedTable = archivedTableElement.DataTable({
                 "dom": 'tip',
-                "paging": true,
-                "info": true,
-                "order": [[4, "desc"]], // Default sort by the 'Date Archived' column
+                "pageLength": 50,
+                "order": [[5, "desc"]], // Sort by 'Date Archived'
                 "columnDefs": [
-                    { "orderable": false, "targets": 0 } // Disable sorting on the actions column
+                    { "orderable": false, "targets": [0, 1] } // Disable sorting on Checkbox & Actions columns
                 ]
             });
-            // Link custom controls to the new table instance
+
+            // Link custom controls
             $('#fsbhoa-archived-cardholder-search-input').on('keyup', function() { archivedTable.search($(this).val()).draw(); });
             $('#fsbhoa-archived-custom-length-menu').on('change', function() { archivedTable.page.len($(this).val()).draw(); });
+
+            // Select All Checkbox logic (Native)
+            $('#cb-select-all-archived').on('change', function() {
+                var isChecked = $(this).prop('checked');
+                // Use DataTables $ API to check boxes across ALL pages in memory
+                archivedTable.$('.archived-cb').prop('checked', isChecked);
+            });
+
+            // Handle the bulk form submission
+            $('#fsbhoa-bulk-archived-form').on('submit', function(e) {
+                const action = $('#archived-bulk-action-selector').val();
+
+                // Use DataTables $ API to find checked boxes across ALL pages
+                const checkedBoxes = archivedTable.$('.archived-cb:checked');
+
+                if (action === '-1') {
+                    e.preventDefault();
+                    return;
+                }
+
+                if (checkedBoxes.length === 0) {
+                    e.preventDefault();
+                    alert('Please select at least one cardholder.');
+                    return;
+                }
+
+                if (action === 'purge') {
+                    if (!confirm('WARNING: You are about to purge ' + checkedBoxes.length + ' cardholder(s). They will be hidden from this list permanently. Are you sure?')) {
+                        e.preventDefault();
+                        return;
+                    }
+                } else if (action === 'restore') {
+                    if (!confirm('You are about to restore ' + checkedBoxes.length + ' cardholder(s) to Inactive/Active status. Proceed?')) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
+
+                e.preventDefault(); // Stop normal form submission
+
+                const adminPostUrl = $(this).attr('action');
+                const bulkForm = $('<form>', { 'method': 'POST', 'action': adminPostUrl });
+
+                bulkForm.append($('<input>', { 'type': 'hidden', 'name': 'action', 'value': 'fsbhoa_bulk_archived_action' }));
+                bulkForm.append($('<input>', { 'type': 'hidden', 'name': '_wpnonce', 'value': $('#fsbhoa-bulk-archived-form input[name="_wpnonce"]').val() }));
+                bulkForm.append($('<input>', { 'type': 'hidden', 'name': 'bulk_action', 'value': action }));
+
+                // Inject selected IDs into the new form
+                checkedBoxes.each(function() {
+                    bulkForm.append($('<input>', { 'type': 'hidden', 'name': 'cardholder_ids[]', 'value': $(this).val() }));
+                });
+
+                $('body').append(bulkForm);
+                bulkForm.submit();
+                bulkForm.remove();
+
+                $('#archived-bulk-action-selector').val('-1');
+            });
         }
     }
 

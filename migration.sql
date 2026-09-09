@@ -73,3 +73,26 @@ DROP COLUMN rfid_id,
 DROP COLUMN card_issue_date,
 DROP COLUMN card_expiry_date;
 
+-- ==============================================================================
+-- STEP 7: Update ac_vehicles for shared vehicles and nullable plates
+-- ==============================================================================
+
+-- Make the license_plate column nullable to support empty plate saves
+ALTER TABLE ac_vehicles MODIFY COLUMN license_plate VARCHAR(20) NULL DEFAULT NULL;
+
+-- Drop the unique constraint so multiple households can register the same shared vehicle
+ALTER TABLE ac_vehicles DROP INDEX idx_license_plate_state;
+
+-- Add it back as a standard index so LPR queries remain fast
+CREATE INDEX idx_license_plate_state ON ac_vehicles (license_plate, plate_state);
+
+INSERT IGNORE INTO ac_credential_types (type_code, description)
+VALUES ('DK_DIR_OPT_IN', 'Resident authorization to list phone in visitor directory');
+
+-- ==============================================================================
+-- STEP 8: Add cardholder_type discriminator for dual-entity management
+-- ==============================================================================
+
+ALTER TABLE ac_cardholders
+ADD COLUMN cardholder_type ENUM('resident', 'vendor') NOT NULL DEFAULT 'resident' AFTER cardholder_status,
+ADD INDEX idx_cardholder_type_status (cardholder_type, cardholder_status);

@@ -7,31 +7,33 @@ if ( ! defined( 'WPINC' ) ) { die; }
  * @param array $form_data The current data for the form.
  */
 function fsbhoa_render_address_section( $form_data ) {
+    $resident_type = isset($form_data['resident_type']) ? $form_data['resident_type'] : '';
     ?>
     <div class="fsbhoa-form-section">
         <div class="form-row">
             <!-- Property Address Field -->
             <div class="form-field is-flexible">
                  <label for="fsbhoa_property_search_input"><?php esc_html_e( 'Property Address', 'fsbhoa-ac' ); ?></label>
-                 <!-- CHANGED: Updated placeholder text -->
                 <input type="text" id="fsbhoa_property_search_input" name="property_address_display" placeholder="<?php esc_attr_e( 'Start typing to search...', 'fsbhoa-ac' ); ?>" value="<?php echo esc_attr($form_data['property_address_display']); ?>">
                 <input type="hidden" name="property_id" id="fsbhoa_property_id_hidden" value="<?php echo esc_attr($form_data['property_id']); ?>">
-                <!-- REMOVED: The description paragraph and clear selection span have been removed -->
+                
             </div>
 
             <!-- Resident Type Field -->
             <div class="form-field">
                 <label for="resident_type"><?php esc_html_e( 'Resident Type', 'fsbhoa-ac' ); ?></label>
                 <select name="resident_type" id="resident_type">
-                    <?php $current_resident_type = isset($form_data['resident_type']) ? $form_data['resident_type'] : ''; ?>
-                    <option value="" <?php selected($current_resident_type, ''); ?>>-- Select Type --</option>
-                    <option value="Resident Owner" <?php selected($current_resident_type, 'Resident Owner'); ?>>Resident Owner</option>
-                    <option value="Landlord" <?php selected($current_resident_type, 'Landlord'); ?>>Landlord</option>
-                    <option value="Guest" <?php selected($current_resident_type, 'Guest'); ?>>Guest</option>
-                    <option value="Tenant" <?php selected($current_resident_type, 'Tenant'); ?>>Tenant</option>
-                    <option value="Staff" <?php selected($current_resident_type, 'Staff'); ?>>Staff</option>
-                    <option value="Contractor" <?php selected($current_resident_type, 'Contractor'); ?>>Contractor</option>
-                    <option value="Other" <?php selected($current_resident_type, 'Other'); ?>>Other</option>
+                    <option value="">Select Type</option>
+                    <option value="Resident Owner" <?php selected($resident_type, 'Resident Owner'); ?>>Resident Owner</option>
+                    <option value="Landlord" <?php selected($resident_type, 'Landlord'); ?>>Landlord</option>
+                    <option value="Tenant" <?php selected($resident_type, 'Tenant'); ?>>Tenant</option>
+                    <option value="Family Member" <?php selected($resident_type, 'Family Member'); ?>>Family Member</option>
+                    <option value="Property Manager" <?php selected($resident_type, 'Property Manager'); ?>>Property Manager</option>
+                    <option value="Contractor" <?php selected($resident_type, 'Contractor'); ?>>Contractor</option>
+                    <option value="Staff" <?php selected($resident_type, 'Staff'); ?>>Staff</option>
+                    <option value="Emergency" <?php selected($resident_type, 'Emergency'); ?>>Emergency</option>
+                    <option value="Delivery" <?php selected($resident_type, 'Delivery'); ?>>Delivery</option>
+                    <option value="Other" <?php selected($resident_type, 'Other'); ?>>Other</option>
                 </select>
             </div>
             <div class="form-field fsbhoa-checkbox-field">
@@ -55,7 +57,10 @@ function fsbhoa_render_address_section( $form_data ) {
  function fsbhoa_validate_address_data( $post_data ) {
     $errors = array();
     $sanitized_data = array();
-    $allowed_resident_types = array('Resident Owner', 'Landlord', 'Tenant', 'Guest', 'Staff', 'Contractor', 'Other');
+    $allowed_resident_types = array(
+        'Resident Owner', 'Landlord', 'Tenant', 'Family Member',
+        'Property Manager', 'Staff', 'Contractor', 'Emergency', 'Delivery', 'Other'
+    );
 
     $sanitized_data['resident_type'] = isset($post_data['resident_type']) ? sanitize_text_field(wp_unslash($post_data['resident_type'])) : '';
     $sanitized_data['property_id']   = isset($post_data['property_id']) && !empty($post_data['property_id']) ? absint($post_data['property_id']) : null;

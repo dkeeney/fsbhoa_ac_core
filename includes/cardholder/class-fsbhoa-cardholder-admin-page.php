@@ -50,6 +50,14 @@ class Fsbhoa_Cardholder_Admin_Page {
         if ($feedback !== false) {
             // RECOVERING FROM ERROR
             $form_data = array_merge($form_data, $feedback['data']);
+            
+            // TRANSLATE: The form uses 'cardholder_id', but the database expects 'id'
+            if ($is_edit_mode) { $form_data['id'] = $item_id_for_edit; }
+            
+            //  Map the posted hidden field back to the view's expected variable
+            if ( !empty($feedback['data']['fsbhoa_photo_base64']) ) {
+                $form_data['photo_base64'] = $feedback['data']['fsbhoa_photo_base64'];
+            }
             $errors = $feedback['errors'];
             delete_transient($transient_key);
         
@@ -117,11 +125,17 @@ class Fsbhoa_Cardholder_Admin_Page {
                 <?php wp_nonce_field( $nonce_action, '_wpnonce' ); ?>
                 <?php
                 // We no longer use a table, just call the render functions for our sections
+                require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-address-section.php';
+                fsbhoa_render_address_section( $form_data );
+
+                require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-household-section.php';
+                fsbhoa_render_household_section($form_data, $is_edit_mode);
+
                 require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-profile-section.php';
                 fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_groups,  $is_edit_mode );
 
-                require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-address-section.php';
-                fsbhoa_render_address_section( $form_data );
+                require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-vehicles-section.php';
+                fsbhoa_render_vehicles_section( $form_data );
 
                 // Ask hardware plugins to draw their credential fields (RFID, PIN, etc.)
                 do_action('fsbhoa_render_credential_fields', $form_data, $is_edit_mode);

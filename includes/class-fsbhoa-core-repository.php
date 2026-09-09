@@ -40,6 +40,14 @@ class Fsbhoa_Core_Repository {
             KEY `idx_street_name_house_number` (`street_name`,`house_number`)
         ) ENGINE=InnoDB {$charset_collate};");
 
+
+        $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_households` (
+            `household_id` int NOT NULL AUTO_INCREMENT,
+            `household_name` varchar(100) NOT NULL,
+            `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`household_id`)
+        ) ENGINE=InnoDB {$charset_collate};");
+
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_cardholders` (
             `id` int NOT NULL AUTO_INCREMENT,
             `first_name` varchar(100) DEFAULT NULL,
@@ -48,12 +56,14 @@ class Fsbhoa_Core_Repository {
             `import_first_name` varchar(255) DEFAULT NULL,
             `import_last_name` varchar(255) DEFAULT NULL,
             `property_id` int DEFAULT NULL,
+            `household_id` int DEFAULT NULL,
             `email` varchar(255) DEFAULT NULL,
             `email_used` tinyint(1) NOT NULL DEFAULT '0',
             `phone` varchar(30) DEFAULT NULL,
             `phone_type` varchar(10) DEFAULT 'Mobile',
             `photo` longblob,
             `cardholder_status` varchar(20) NOT NULL DEFAULT 'inactive',
+            `cardholder_type` enum('resident','vendor') NOT NULL DEFAULT 'resident',
             `notes` text,
             `resident_type` varchar(50) DEFAULT 'Resident Owner',
             `origin` varchar(20) NOT NULL DEFAULT 'manual' COMMENT 'Indicates if the record was from a csv import or added manually',
@@ -61,18 +71,22 @@ class Fsbhoa_Core_Repository {
             `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             `deleted_at` datetime DEFAULT NULL,
             `groups_csv` text COMMENT 'Comma-separated list of group IDs the user belonged to at the time of deletion.',
-            `active_rfid` varchar(8) GENERATED ALWAYS AS (if(((`card_status` in ('active','inactive','disabled')) and (`rfid_id` is not null) and (`rfid_id` <> '')),`rfid_id`,NULL)) STORED,
             PRIMARY KEY (`id`),
             KEY `idx_last_name` (`last_name`),
             KEY `idx_first_name` (`first_name`),
             KEY `idx_property_id` (`property_id`),
+            KEY `idx_household_id` (`household_id`),
             KEY `idx_email` (`email`),
             KEY `idx_phone` (`phone`),
             KEY `idx_phone_type` (`phone_type`),
             KEY `idx_cardholder_status` (`cardholder_status`),
+            KEY `idx_cardholder_type_status` (`cardholder_type`, `cardholder_status`),
             KEY `idx_resident_type` (`resident_type`),
-            CONSTRAINT `fk_ac_cardholders_property` FOREIGN KEY (`property_id`) REFERENCES `ac_property` (`property_id`) ON DELETE SET NULL ON UPDATE CASCADE
+            CONSTRAINT `fk_ac_cardholders_property` FOREIGN KEY (`property_id`) REFERENCES `ac_property` (`property_id`) ON DELETE SET NULL ON UPDATE CASCADE,
+            CONSTRAINT `fk_ac_cardholders_household` FOREIGN KEY (`household_id`) REFERENCES `ac_households` (`household_id`) ON DELETE SET NULL ON UPDATE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
+
+
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_groups` (
             `group_id` int NOT NULL AUTO_INCREMENT,
@@ -85,6 +99,7 @@ class Fsbhoa_Core_Repository {
             UNIQUE KEY `unique_group_name` (`group_name`)
         ) ENGINE=InnoDB {$charset_collate};");
 
+
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_cardholder_groups` (
             `cardholder_id` int NOT NULL,
             `group_id` int NOT NULL,
@@ -93,6 +108,7 @@ class Fsbhoa_Core_Repository {
             CONSTRAINT `fk_cardholder_groups_cardholder` FOREIGN KEY (`cardholder_id`) REFERENCES `ac_cardholders` (`id`) ON DELETE CASCADE,
             CONSTRAINT `fk_cardholder_groups_group` FOREIGN KEY (`group_id`) REFERENCES `ac_groups` (`group_id`) ON DELETE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
+
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_controllers` (
             `controller_record_id` int NOT NULL AUTO_INCREMENT,
@@ -109,6 +125,8 @@ class Fsbhoa_Core_Repository {
             UNIQUE KEY `idx_uhppoted_device_id_unique` (`uhppoted_device_id`),
             UNIQUE KEY `idx_friendly_name_unique` (`friendly_name`)
         ) ENGINE=InnoDB {$charset_collate};");
+
+
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_doors` (
             `door_record_id` int NOT NULL AUTO_INCREMENT,
@@ -130,6 +148,8 @@ class Fsbhoa_Core_Repository {
             KEY `idx_fk_controller_record_id` (`controller_record_id`),
             CONSTRAINT `fk_ac_doors_controller` FOREIGN KEY (`controller_record_id`) REFERENCES `ac_controllers` (`controller_record_id`) ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
+
+
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_schedules` (
             `schedule_id` int UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -168,6 +188,8 @@ class Fsbhoa_Core_Repository {
             CONSTRAINT `fk_group_permissions_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `ac_schedules` (`schedule_id`) ON DELETE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
 
+
+
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_access_log` (
             `log_id` int NOT NULL AUTO_INCREMENT,
             `event_timestamp` datetime(3) NOT NULL,
@@ -191,6 +213,8 @@ class Fsbhoa_Core_Repository {
             CONSTRAINT `fk_ac_access_log_cardholder` FOREIGN KEY (`cardholder_id`) REFERENCES `ac_cardholders` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
 
+
+
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_print_log` (
             `log_id` int NOT NULL AUTO_INCREMENT,
             `system_job_id` varchar(50) NOT NULL COMMENT 'Unique ID generated by our Java app for this print request',
@@ -213,6 +237,7 @@ class Fsbhoa_Core_Repository {
             KEY `idx_submitted_by_user_print_log` (`submitted_by_user`),
             CONSTRAINT `fk_ac_print_log_cardholder` FOREIGN KEY (`cardholder_id`) REFERENCES `ac_cardholders` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
+
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_task_list` (
             `id` int NOT NULL AUTO_INCREMENT,
@@ -240,6 +265,8 @@ class Fsbhoa_Core_Repository {
             CONSTRAINT `fk_task_list_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `ac_schedules` (`schedule_id`) ON DELETE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
 
+
+
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_amenities` (
             `id` int NOT NULL AUTO_INCREMENT COMMENT 'Primary key for the amenity',
             `name` varchar(100) NOT NULL COMMENT 'The display name of the amenity (e.g., Billiards, Library)',
@@ -252,6 +279,8 @@ class Fsbhoa_Core_Repository {
             UNIQUE KEY `idx_name_unique` (`name`)
         ) ENGINE=InnoDB {$charset_collate};");
 
+
+
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_pending_changes` (
             `id` int NOT NULL AUTO_INCREMENT,
             `change_type` varchar(20) NOT NULL DEFAULT 'cardholder',
@@ -260,6 +289,8 @@ class Fsbhoa_Core_Repository {
             `changed_at` datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`)
         ) ENGINE=InnoDB {$charset_collate};");
+
+
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_sync_hashes` (
             `device_id` varchar(20) NOT NULL,
@@ -270,21 +301,26 @@ class Fsbhoa_Core_Repository {
         ) ENGINE=InnoDB {$charset_collate};");
 
 
+
         // ====================================================================
         // 2. NEW CREDENTIAL & VEHICLE TABLES (Phase 2 Evolution)
         // ====================================================================
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_credential_types` (
-            `type_code` varchar(30) NOT NULL COMMENT 'e.g., MIFARE_BADGE, DOORKING_PIN, WINDSHIELD_RFID',
-            `display_name` varchar(50) NOT NULL,
-            `max_length` int DEFAULT NULL COMMENT 'For UI Validation',
-            `requires_facility_code` tinyint(1) NOT NULL DEFAULT '0',
-            PRIMARY KEY (`type_code`)
+            `id` int NOT NULL AUTO_INCREMENT,
+            `type_code` varchar(50) NOT NULL,
+            `description` varchar(255) DEFAULT NULL,
+            `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `type_code` (`type_code`)
         ) ENGINE=InnoDB {$charset_collate};");
 
+
+        // Vehicles must be created BEFORE credentials to satisfy the foreign key constraint
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_vehicles` (
             `vehicle_id` int NOT NULL AUTO_INCREMENT,
-            `license_plate` varchar(20) NOT NULL,
+            `household_id` int NOT NULL,
+            `license_plate` varchar(20) DEFAULT NULL,
             `plate_state` varchar(5) DEFAULT 'CA',
             `vehicle_type` varchar(50) DEFAULT 'Automobile' COMMENT 'e.g., Automobile, RV, Golf Cart',
             `make` varchar(50) DEFAULT NULL,
@@ -295,33 +331,28 @@ class Fsbhoa_Core_Repository {
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`vehicle_id`),
-            UNIQUE KEY `idx_license_plate_state` (`license_plate`, `plate_state`)
+            KEY `idx_license_plate_state` (`license_plate`, `plate_state`),
+            KEY `idx_vehicle_household` (`household_id`),
+            CONSTRAINT `fk_vehicle_household` FOREIGN KEY (`household_id`) REFERENCES `ac_households` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB {$charset_collate};");
 
-        $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_cardholder_vehicles` (
-            `cardholder_id` int NOT NULL,
-            `vehicle_id` int NOT NULL,
-            `relationship_type` varchar(50) DEFAULT 'Primary',
-            `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`cardholder_id`, `vehicle_id`),
-            CONSTRAINT `fk_cv_cardholder` FOREIGN KEY (`cardholder_id`) REFERENCES `ac_cardholders` (`id`) ON DELETE CASCADE,
-            CONSTRAINT `fk_cv_vehicle` FOREIGN KEY (`vehicle_id`) REFERENCES `ac_vehicles` (`vehicle_id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB {$charset_collate};");
+
+
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_credentials` (
-            `credential_id` int NOT NULL AUTO_INCREMENT,
+            `id` int NOT NULL AUTO_INCREMENT,
             `cardholder_id` int NOT NULL,
             `vehicle_id` int DEFAULT NULL COMMENT 'Optional: Link directly to a vehicle',
-            `credential_type` varchar(30) NOT NULL,
+            `credential_type` varchar(50) NOT NULL,
             `credential_value` varchar(50) NOT NULL,
-            `facility_code` int DEFAULT NULL,
             `status` varchar(30) DEFAULT 'inactive',
+            `issue_date` date DEFAULT CURRENT_TIMESTAMP,
             `expiration_date` datetime DEFAULT NULL,
             `notes` text,
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (`credential_id`),
-            UNIQUE KEY `idx_type_value` (`credential_type`, `credential_value`),
+            PRIMARY KEY (`id`),
+            KEY `idx_type_value` (`credential_type`, `credential_value`),
             KEY `idx_cred_cardholder` (`cardholder_id`),
             KEY `idx_cred_vehicle` (`vehicle_id`),
             CONSTRAINT `fk_cred_type_code` FOREIGN KEY (`credential_type`) REFERENCES `ac_credential_types` (`type_code`) ON UPDATE CASCADE,
@@ -330,14 +361,19 @@ class Fsbhoa_Core_Repository {
         ) ENGINE=InnoDB {$charset_collate};");
 
 
+
+
+
         // ====================================================================
         // 3. INITIAL SEED DATA
         // ====================================================================
         
-        $wpdb->query("INSERT IGNORE INTO `ac_credential_types` (`type_code`, `display_name`, `max_length`, `requires_facility_code`) VALUES
-            ('MIFARE_BADGE', 'Photo ID Badge', 8, 0),
-            ('DOORKING_PIN', 'DoorKing PIN Code', 4, 0),
-            ('WINDSHIELD_RFID', 'Windshield Tag', 5, 1);");
+        $wpdb->query("INSERT IGNORE INTO `ac_credential_types` (`type_code`, `description`) VALUES
+            ('MIFARE_BADGE', 'Photo ID Badge'),
+            ('DK_DIR_CODE', 'DoorKing Directory Code'),
+            ('DK_DIR_OPT_IN', 'Resident authorization to list phone in visitor directory'),
+            ('DK_ENTRY_CODE', 'DoorKing Entry PIN Code'),
+            ('DK_WINDSHIELD', 'Windshield RFID Tag');");
     }
 }
 

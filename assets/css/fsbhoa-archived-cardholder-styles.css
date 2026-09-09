@@ -16,27 +16,26 @@ body.page-slug-archived-cardholders .fsbhoa-frontend-wrap {
     vertical-align: middle !important;
 }
 
-/* 3. Set a max-width on the Notes column to prevent it from growing too large */
-#fsbhoa-archived-cardholder-table th:nth-child(6),
-#fsbhoa-archived-cardholder-table td:nth-child(6) {
-    max-width: 350px;
+/* 3. Set a max-width on the Notes column (now column 7) */
+#fsbhoa-archived-cardholder-table th:nth-child(7),
+#fsbhoa-archived-cardholder-table td:nth-child(7) {
+    max-width: 300px;
     white-space: normal;
     word-break: break-word;
 }
 
-/* 4. Prevent other columns from wrapping */
-#fsbhoa-archived-cardholder-table td:nth-child(2), /* Name */
-#fsbhoa-archived-cardholder-table td:nth-child(3), /* Property */
-#fsbhoa-archived-cardholder-table td:nth-child(4), /* Email */
-#fsbhoa-archived-cardholder-table td:nth-child(5)  /* Date */ {
+/* 4. Prevent Actions (Col 2) and Date Archived (Col 6) from wrapping so they never squish */
+#fsbhoa-archived-cardholder-table td:nth-child(2),
+#fsbhoa-archived-cardholder-table td:nth-child(6) {
     white-space: nowrap;
 }
 
-/* 5. Force the Notes text to have no indentation */
-.notes-cell .notes-text-container {
-    padding-left: 0 !important;
-    margin-left: 0 !important;
-    text-indent: 0 !important;
+/* 5. Allow Name (Col 3), Property (Col 4), and Email (Col 5) to wrap gracefully if they are extremely long */
+#fsbhoa-archived-cardholder-table td:nth-child(3),
+#fsbhoa-archived-cardholder-table td:nth-child(4),
+#fsbhoa-archived-cardholder-table td:nth-child(5) {
+    white-space: normal;
+    word-wrap: break-word;
 }
 
 /* 6. Widen the Actions column and position the Edit button */
@@ -78,3 +77,20 @@ tr.fsbhoa-manual-record:hover td { background-color: #FDFDCC !important; }
     border: 2px solid #444;
     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
 }
+
+
+/* --- DataTables Select Checkbox Styles --- */
+table.dataTable td.select-checkbox,
+table.dataTable th.select-checkbox { position: relative; cursor: pointer; }
+table.dataTable td.select-checkbox::before,
+table.dataTable th.select-checkbox::before {
+    content: ' '; display: block; width: 16px; height: 16px; border: 1px solid #8c8f94; border-radius: 3px; margin: 0 auto; background-color: #fdfdfd;
+}
+table.dataTable tr.selected td.select-checkbox::before { background-color: #0073aa; border-color: #0073aa; }
+table.dataTable tr.selected td.select-checkbox::after,
+table.dataTable th.select-checkbox.selected::after {
+    content: '\f147'; font-family: 'dashicons'; font-size: 20px; color: #fff; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; line-height: 1;
+}
+.fsbhoa-checkbox-column { width: 30px !important; }
+
+

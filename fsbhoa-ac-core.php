@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       FSBHOA Access Control Core
+ * Plugin Name:       FSBHOA Access Control - Core
  * Plugin URI:        https://github.com/dkeeney/fsbhoa_ac_core
  * Description:       Manages HOA resident photo IDs, access control, and card printing for FSBHOA.
  * Version:           0.1.0
@@ -98,6 +98,7 @@ require_once FSBHOA_AC_PLUGIN_DIR . 'includes/fsbhoa-cardholder-functions.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/cardholder/class-fsbhoa-cardholder-admin-page.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/cardholder/class-fsbhoa-cardholder-actions.php';
 
+
 // --- Property Module (Moved) ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/property/class-fsbhoa-property-admin-page.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/property/class-fsbhoa-property-actions.php';
@@ -110,10 +111,6 @@ require_once FSBHOA_AC_PLUGIN_DIR . 'includes/archived/class-fsbhoa-archived-car
 // --- Schedules ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/schedules/class-fsbhoa-schedule-groups-actions.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/schedules/class-fsbhoa-schedule-ajax-handler.php';
-
-// --- Import ---
-require_once FSBHOA_AC_PLUGIN_DIR . 'includes/import/csv-import-module.php';
-require_once FSBHOA_AC_PLUGIN_DIR . 'includes/import/class-fsbhoa-import-rest-api.php';
 
 // --- Live Monitor ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/fsbhoa-access-service-functions.php';
@@ -265,15 +262,6 @@ function fsbhoa_ac_api_init() {
     if (class_exists('Fsbhoa_Print_REST_API')) {
         $print_api = new Fsbhoa_Print_REST_API();
         $print_api->register_routes();
-    }
-    // Instantiate the Import REST API handler
-    if (class_exists('Fsbhoa_Import_REST_API')) {
-        $import_api = new Fsbhoa_Import_REST_API();
-        $import_api->register_routes();
-    }
-    if (class_exists('Fsbhoa_Verification_REST_API')) {
-        $verification_api = new Fsbhoa_Verification_REST_API();
-        $verification_api->register_routes();
     }
     
     // Any other true REST API handlers would be initialized here in the future.
