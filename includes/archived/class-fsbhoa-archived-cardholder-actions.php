@@ -25,95 +25,31 @@ class Fsbhoa_Archived_Cardholder_Actions {
 	}
 
 	/**
-	 * Handles restoring an archived cardholder back to 'inactive' status.
-	 * NOW WRAPPED IN A TRANSACTION FOR DATA INTEGRITY.
+	 * Handles restoring an archived cardholder back to 'active' status.
 	 */
-	public function handle_restore_action() {
-		global $wpdb;
+    public function handle_restore_action() {
+        $cardholder_id = isset( $_GET['cardholder_id'] ) ? absint( $_GET['cardholder_id'] ) : 0;
+        if ( ! $cardholder_id ) {
+            wp_die( 'Invalid cardholder ID specified.', 'Error', [ 'back_link' => true ] );
+        }
+        check_admin_referer( 'fsbhoa_restore_archived_cardholder_' . $cardholder_id );
 
-		$cardholder_id = isset( $_GET['cardholder_id'] ) ? absint( $_GET['cardholder_id'] ) : 0;
-		if ( ! $cardholder_id ) {
-			wp_die( 'Invalid cardholder ID specified.', 'Error', [ 'back_link' => true ] );
-		}
-		check_admin_referer( 'fsbhoa_restore_archived_cardholder_' . $cardholder_id );
+        require_once plugin_dir_path( dirname( __DIR__ ) ) . 'includes/fsbhoa-cardholder-functions.php';
 
-		// --- START TRANSACTION ---
-		$wpdb->query( 'START TRANSACTION' );
+        $result = fsbhoa_restore_cardholder( $cardholder_id );
 
-		$table_cardholders = 'ac_cardholders';
+        if ( is_wp_error( $result ) ) {
+            wp_die( $result->get_error_message(), 'Error', [ 'back_link' => true ] );
+        }
 
-		$source_record = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table_cardholders} WHERE id = %d FOR UPDATE", $cardholder_id ) );
+        // Redirect to Live Cardholders and highlight the restored ID
+        $page_object  = get_page_by_path( 'cardholder' );
+        $redirect_url = $page_object ? get_permalink( $page_object->ID ) : home_url( '/' );
+        $redirect_url = add_query_arg( [ 'message' => 'cardholder_restored', 'highlight' => $cardholder_id ], $redirect_url );
 
-		// DB ERROR CHECK
-		if ( $wpdb->last_error ) {
-			$wpdb->query( 'ROLLBACK' );
-			wp_die( 'Database error while fetching archived data. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
-		}
-
-		$groups_csv = $source_record->groups_csv;
-
-		$has_credential = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1",
-			$cardholder_id
-		) );
-		$new_status = $has_credential ? 'active' : 'inactive';
-
-		$result = $wpdb->update(
-			$table_cardholders,
-			[
-				'cardholder_status' => $new_status,
-				'deleted_at'        => null,
-				'groups_csv'        => null
-			],
-			[ 'id' => $cardholder_id ],
-			[ '%s', null, null ],
-			[ '%d' ]
-		);
-
-		// DB ERROR CHECK
-		if ( false === $result ) {
-			$wpdb->query( 'ROLLBACK' );
-			wp_die( 'Database error while updating cardholder status during restore. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
-		}
-
-		if ( ! empty( $groups_csv ) ) {
-			$table_memberships = 'ac_cardholder_groups';
-			$wpdb->delete( $table_memberships, [ 'cardholder_id' => $cardholder_id ] );
-
-			// DB ERROR CHECK
-			if ( $wpdb->last_error ) {
-				$wpdb->query( 'ROLLBACK' );
-				wp_die( 'Database error while clearing old group memberships. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
-			}
-
-			$group_ids_to_restore = explode( ',', $groups_csv );
-			foreach ( $group_ids_to_restore as $group_id ) {
-				$group_id = absint( $group_id );
-				if ( $group_id > 0 ) {
-					$inserted = $wpdb->insert( $table_memberships, [ 'cardholder_id' => $cardholder_id, 'group_id' => $group_id ], [ '%d', '%d' ] );
-					// DB ERROR CHECK
-					if ( false === $inserted ) {
-						$wpdb->query( 'ROLLBACK' );
-						wp_die( 'Database error while restoring group memberships. DB Error: ' . esc_html( $wpdb->last_error ), 'Error', [ 'back_link' => true ] );
-					}
-				}
-			}
-		}
-		// --- Reactivate all credentials upon restore ---
-		$wpdb->update( 'ac_credentials', [ 'status' => 'active' ], [ 'cardholder_id' => $cardholder_id ], [ '%s' ], [ '%d' ] );
-
-		// --- COMMIT TRANSACTION ---
-		$wpdb->query( 'COMMIT' );
-		fsbhoa_log_pending_change( 'cardholder', $cardholder_id );
-
-		// Get the actual URL of the Live Cardholders page
-		$page_object  = get_page_by_path( 'cardholder' );
-		$redirect_url = $page_object ? get_permalink( $page_object->ID ) : home_url( '/' );
-
-		$redirect_url = add_query_arg( [ 'message' => 'cardholder_restored', 'highlight' => $cardholder_id ], $redirect_url );
-		wp_safe_redirect( $redirect_url );
-		exit;
-	}
+        wp_safe_redirect( $redirect_url );
+        exit;
+    }
 
 	/**
 	 * Handles "purging" a cardholder. This sets their status to 'purged',
@@ -312,45 +248,17 @@ class Fsbhoa_Archived_Cardholder_Actions {
 				$processed_count = count( $cardholder_ids );
 				// Clean out credentials for all purged records
 				$wpdb->query( "DELETE FROM ac_credentials WHERE cardholder_id IN ($ids_string)" );
-			}
-		} elseif ( $bulk_action === 'restore' ) {
-			// Bulk Restore: Wrap all restores in a single database transaction
-			$wpdb->query( 'START TRANSACTION' );
-			$error_occurred = false;
+            } 
+        } elseif ( $bulk_action === 'restore' ) {
+            require_once plugin_dir_path( dirname( __DIR__ ) ) . 'includes/fsbhoa-cardholder-functions.php';
 
-			foreach ( $cardholder_ids as $cardholder_id ) {
-				$source_record = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM ac_cardholders WHERE id = %d FOR UPDATE", $cardholder_id ) );
-				if ( ! $source_record ) continue;
-
-				$groups_csv     = $source_record->groups_csv;
-				$has_credential = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1", $cardholder_id ) );
-				$new_status     = $has_credential ? 'active' : 'inactive';
-
-				$wpdb->update( 'ac_cardholders', [ 'cardholder_status' => $new_status, 'deleted_at' => null, 'groups_csv' => null ], [ 'id' => $cardholder_id ], [ '%s', null, null ], [ '%d' ] );
-
-				if ( ! empty( $groups_csv ) ) {
-					$wpdb->delete( 'ac_cardholder_groups', [ 'cardholder_id' => $cardholder_id ] );
-					$group_ids = explode( ',', $groups_csv );
-					foreach ( $group_ids as $gid ) {
-						$gid = absint( $gid );
-						if ( $gid > 0 ) {
-							$wpdb->insert( 'ac_cardholder_groups', [ 'cardholder_id' => $cardholder_id, 'group_id' => $gid ], [ '%d', '%d' ] );
-						}
-					}
-				}
-				$wpdb->update( 'ac_credentials', [ 'status' => 'active' ], [ 'cardholder_id' => $cardholder_id ], [ '%s' ], [ '%d' ] );
-
-				fsbhoa_log_pending_change( 'cardholder', $cardholder_id, json_encode( [ 'action' => 'bulk_restore' ] ) );
-				$processed_count++;
-			}
-
-			if ( $error_occurred ) {
-				$wpdb->query( 'ROLLBACK' );
-				wp_die( 'Error processing bulk restore.', 'Error', [ 'back_link' => true ] );
-			} else {
-				$wpdb->query( 'COMMIT' );
-			}
-		}
+            foreach ( $cardholder_ids as $cardholder_id ) {
+                $res = fsbhoa_restore_cardholder( $cardholder_id );
+                if ( ! is_wp_error( $res ) ) {
+                    $processed_count++;
+                }
+            }
+        }
 
 		if ( $bulk_action === 'restore' && $processed_count > 0 ) {
 			// Redirect to Live Cardholders and highlight the first restored ID

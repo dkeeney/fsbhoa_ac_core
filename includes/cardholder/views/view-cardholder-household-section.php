@@ -38,29 +38,51 @@ function fsbhoa_render_household_section( $form_data, $is_edit_mode ) {
  * @param bool  $is_edit_mode Whether we are editing an existing record.
  *
  */
-function fsbhoa_process_household_on_save( &$data_to_save, $property_id, $item_id, $is_edit_mode ) {
+ function fsbhoa_process_household_on_save( &$data_to_save, $property_id, $item_id, $is_edit_mode ) {
     global $wpdb;
 
     if ( empty($property_id) || $property_id <= 0 ) {
         return;
     }
 
-    // Define which types are strictly standalone (they do NOT share a household)
+    // 1. Strictly standalone single-person types (Contractor, Staff, etc.)
     $standalone_types = ['Contractor', 'Staff', 'Other', 'Emergency', 'Delivery'];
-    $resident_type = isset($data_to_save['resident_type']) ? $data_to_save['resident_type'] : '';
+    $resident_type    = isset($data_to_save['resident_type']) ? trim($data_to_save['resident_type']) : '';
+    $exclude_sql      = $is_edit_mode ? $wpdb->prepare(" AND id != %d", $item_id) : "";
 
-    $existing_household_member = null;
+    if ( in_array($resident_type, $standalone_types) ) {
+        // Standalone types always get their own individual household
+        $safe_last_name = (!empty($data_to_save['last_name'])) ? $data_to_save['last_name'] : 'New';
+        $household_name = sanitize_text_field( $safe_last_name . " ({$resident_type})" );
+        $wpdb->insert('ac_households', ['household_name' => $household_name]);
+        if ( $wpdb->insert_id ) {
+            $data_to_save['household_id'] = $wpdb->insert_id;
+        }
+        return;
+    }
 
-    // Only attempt to group normal residents and landlords
-    if ( !in_array($resident_type, $standalone_types) ) {
-        $exclude_sql = $is_edit_mode ? $wpdb->prepare(" AND id != %d", $item_id) : "";
+    // 2. Determine target household based on whether this is a Landlord or an On-Site Resident
+    $is_landlord = ( strcasecmp($resident_type, 'Landlord') === 0 );
 
-        // Ensure we only join a household that belongs to a NORMAL resident
-        // (We don't want a new resident accidentally joining a Contractor's household)
+    if ( $is_landlord ) {
+        // Group ONLY with other Landlords on this property
         $existing_household_member = $wpdb->get_row($wpdb->prepare(
             "SELECT household_id FROM ac_cardholders
              WHERE property_id = %d
                AND cardholder_status IN ('active', 'inactive')
+               AND resident_type = 'Landlord'
+               AND household_id IS NOT NULL
+               {$exclude_sql}
+             LIMIT 1",
+            $property_id
+        ));
+    } else {
+        // Group ONLY with other on-site residents on this property (exclude Landlord & Standalone)
+        $existing_household_member = $wpdb->get_row($wpdb->prepare(
+            "SELECT household_id FROM ac_cardholders
+             WHERE property_id = %d
+               AND cardholder_status IN ('active', 'inactive')
+               AND resident_type != 'Landlord'
                AND resident_type NOT IN ('Contractor', 'Staff', 'Other', 'Emergency', 'Delivery')
                AND household_id IS NOT NULL
                {$exclude_sql}
@@ -69,15 +91,12 @@ function fsbhoa_process_household_on_save( &$data_to_save, $property_id, $item_i
         ));
     }
 
+    // 3. Assign to found household, or generate a fresh distinct household
     if ( $existing_household_member && !empty($existing_household_member->household_id) ) {
-        // Join the existing active household at this property
         $data_to_save['household_id'] = absint($existing_household_member->household_id);
     } else {
-        // Create a distinct household.
         $safe_last_name = (!empty($data_to_save['last_name'])) ? $data_to_save['last_name'] : 'New';
-
-        // If it's a standalone type, name it "Smith (Contractor)" instead of "Smith Household"
-        $suffix = in_array($resident_type, $standalone_types) ? " ({$resident_type})" : " Household";
+        $suffix         = $is_landlord ? " (Landlord)" : " Household";
         $household_name = sanitize_text_field( $safe_last_name . $suffix );
 
         $wpdb->insert('ac_households', ['household_name' => $household_name]);

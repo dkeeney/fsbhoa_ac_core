@@ -14,6 +14,22 @@
  * Domain Path:       /languages
  */
 
+/**
+ * This is the Core plugin for the Access Control Web App.
+ * The core features are resident and vendor management screens, 
+ * real-time monitor, property lists, event logging, etc. 
+ * In addition, there are plugins to extend the core with more features:
+ *    fsbhoa_ac_doorking - adds management of DoorKing controllers
+ *    fsbhoa_ac_import   - import of data from property management system
+ *    fsbhoa_ac_kiosk    - login kiosk to manage amenities
+ *    fsbhoa_ac_uhppote  - adds management of uhppote controllers
+ *    fsbhoa_ac_zebra    - RFID badge card printer
+ *
+ * The rules are:
+ *   1) the core cannot be aware of any plugin.
+ *   2) plugins can access and depend on the core but on another plugin.
+ */
+
 // If this file is called directly, abort.
 if ( ! defined( 'WPINC' ) ) {
     die;
@@ -98,6 +114,9 @@ require_once FSBHOA_AC_PLUGIN_DIR . 'includes/fsbhoa-cardholder-functions.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/cardholder/class-fsbhoa-cardholder-admin-page.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/cardholder/class-fsbhoa-cardholder-actions.php';
 
+// -- Vendor Module --
+require_once FSBHOA_AC_PLUGIN_DIR . 'includes/vendor/class-fsbhoa-vendor-admin-page.php';
+new Fsbhoa_Vendor_Admin_Page();
 
 // --- Property Module (Moved) ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/property/class-fsbhoa-property-admin-page.php';

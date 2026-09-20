@@ -83,24 +83,3 @@ $has_all_access = isset($group->has_all_access) && $group->has_all_access;
     </div>
 </form>
 
-<div style="display: none;" id="permission-template-wrapper">
-    <table>
-        <tbody id="permission-row-template">
-            <?php
-                $index = '{{INDEX}}';
-                $perm = null;
-                include FSBHOA_AC_PLUGIN_DIR . 'includes/schedules/views/view-group-permission-row.php';
-            ?>
-        </tbody>
-    </table>
-</div>
-
-<?php if (!$is_new) :
-// Only show the visualizer when editing an existing group that is NOT "All Access"
-// But we need to render it so it can be shown.
-// The visualizer uses the $group_id and $schedule_id variables defined in this file's context.
-?>
-    <div id="fsbhoa-visualizer-wrapper" style="<?php echo ($has_all_access) ? 'display: none;' : ''; ?>">
-        <?php include_once FSBHOA_AC_PLUGIN_DIR . 'includes/schedules/views/view-group-schedule-visualizer.php'; ?>
-    </div>
-<?php endif; ?>

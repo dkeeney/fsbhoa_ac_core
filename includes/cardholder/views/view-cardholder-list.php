@@ -154,25 +154,60 @@ function fsbhoa_render_cardholder_list_view() {
 
                             <?php
                                 $display_name = trim( $cardholder['first_name'] . ' ' . $cardholder['last_name'] );
-                                $sort_name = trim( ($cardholder['last_name'] ?? '') . ' ' . ($cardholder['first_name'] ?? '') );
+                                $sort_name    = trim( ($cardholder['last_name'] ?? '') . ' ' . ($cardholder['first_name'] ?? '') );
+
+                                // Prepare clean search string for DataTables without polluting the visible DOM text
+                                $search_tokens = [];
+                                if ( ! empty( $all_creds ) ) {
+                                    $search_tokens[] = implode( ' ', $all_creds );
+                                }
+                                if ( ! empty( $cardholder['title'] ) ) {
+                                    $search_tokens[] = $cardholder['title'];
+                                }
+                                $name_search = trim( $display_name . ' ' . implode( ' ', $search_tokens ) );
                             ?>
-                            <td data-order="<?php echo esc_attr($sort_name); ?>">
-                                <strong><?php echo esc_html($display_name); ?></strong>
-                                <?php if (!empty($all_creds)) : ?>
-                                    <span class="fsbhoa-visually-hidden">Keys: <?php echo esc_html(implode(' ', $all_creds)); ?></span>
-                                <?php endif; ?>
-                                <?php if (!empty($cardholder['title'])) : ?>
-                                    <span class="fsbhoa-visually-hidden">Title: <?php echo esc_html($cardholder['title']); ?></span>
-                                <?php endif; ?>
-                            </td>
+                            <td data-order="<?php echo esc_attr( $sort_name ); ?>" data-search="<?php echo esc_attr( $name_search ); ?>"><strong><?php echo esc_html( $display_name ); ?></strong></td>
                             <?php
                                 $address_display = trim( ($cardholder['house_number'] ?? '') . ' ' . ($cardholder['street_name'] ?? '') );
-                                $sort_address = ($cardholder['street_name'] ?? '') . str_pad(($cardholder['house_number'] ?? 0), 10, "0", STR_PAD_LEFT);
+                                $sort_address    = ($cardholder['street_name'] ?? '') . str_pad( ($cardholder['house_number'] ?? 0), 10, '0', STR_PAD_LEFT );
                             ?>
-                            <td data-order="<?php echo esc_attr($sort_address); ?>">
-                                <?php echo !empty($address_display) ? esc_html($address_display) : '<em>N/A</em>'; ?>
+                            <td data-order="<?php echo esc_attr( $sort_address ); ?>"><?php echo ! empty( $address_display ) ? esc_html( $address_display ) : '<em>N/A</em>'; ?></td>
+                            <td class="fsbhoa-status-column">
+                                <div style="display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
+                                    <div class="fsbhoa-status-indicators" style="display: inline-flex; align-items: center; gap: 4px;">
+                                        <?php
+                                        // 1. Vehicle Icon (Core manages vehicles)
+                                        $has_vehicle = false;
+                                        if ( ! empty( $cardholder['household_id'] ) ) {
+                                            $has_vehicle = (bool) $wpdb->get_var( $wpdb->prepare(
+                                                "SELECT 1 FROM ac_vehicles WHERE household_id = %d LIMIT 1",
+                                                $cardholder['household_id']
+                                            ) );
+                                        }
+                                        if ( $has_vehicle ) : ?>
+                                            <span class="dashicons dashicons-car" title="<?php esc_attr_e( 'Household has registered vehicle(s)', 'fsbhoa-ac' ); ?>" style="font-size: 16px; width: 16px; height: 16px; color: #2271b1;"></span>
+                                        <?php else : ?>
+                                            <span style="display: inline-block; width: 16px;"></span>
+                                        <?php endif; ?>
+
+                                        <?php
+                                        // 2. Photo Icon (Core manages cardholder photo blob)
+                                        $has_photo = ! empty( $cardholder['photo'] );
+                                        if ( $has_photo ) : ?>
+                                            <span class="dashicons dashicons-camera" title="<?php esc_attr_e( 'Photo on file', 'fsbhoa-ac' ); ?>" style="font-size: 16px; width: 16px; height: 16px; color: #008a20;"></span>
+                                        <?php else : ?>
+                                            <span style="display: inline-block; width: 16px;"></span>
+                                        <?php endif; ?>
+
+                                        <?php
+                                        // 3. Subordinate Plugin Hook (DoorKing, UHPPOTE, etc.)
+                                        do_action( 'fsbhoa_cardholder_list_status_icons', $cardholder );
+                                        ?>
+                                    </div>
+
+                                    <span><?php echo esc_html( ucwords( $cardholder['cardholder_status'] ) ); ?></span>
+                                </div>
                             </td>
-                            <td class="fsbhoa-status-column"><?php echo esc_html( ucwords($cardholder['cardholder_status']) ); ?></td>
                             <td class="fsbhoa-type-column">
                                 <?php echo esc_html( $cardholder['resident_type'] ?? '' ); ?>
                             </td>

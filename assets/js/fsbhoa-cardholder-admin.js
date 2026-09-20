@@ -287,6 +287,67 @@ jQuery(function($) {
                     exportForm.remove();
 
                     $('#bulk-action-selector').val('-1');
+
+                } else if (action === 'purge') {   // only for vendor list
+                    e.preventDefault();
+
+                    if (!confirm('You are about to PURGE ' + selectedNodes.length + ' vendor(s). Their access will be revoked immediately, but their log history will be preserved. Proceed?')) {
+                        return;
+                    }
+
+                    const adminPostUrl = (typeof fsbhoa_ajax_settings !== 'undefined' && fsbhoa_ajax_settings.ajax_url)
+                        ? fsbhoa_ajax_settings.ajax_url.replace('admin-ajax.php', 'admin-post.php')
+                        : '/wp-admin/admin-post.php';
+
+                    const purgeForm = $('<form>', { 'method': 'POST', 'action': adminPostUrl });
+
+                    purgeForm.append($('<input>', { 'type': 'hidden', 'name': 'action', 'value': 'fsbhoa_bulk_vendor_action' }));
+                    purgeForm.append($('<input>', { 'type': 'hidden', 'name': '_wpnonce', 'value': $('#fsbhoa-bulk-action-form input[name="_wpnonce"]').val() }));
+                    purgeForm.append($('<input>', { 'type': 'hidden', 'name': 'bulk_action', 'value': 'purge' }));
+                
+                    for (let i = 0; i < selectedNodes.length; i++) {
+                        const id = $(selectedNodes[i]).data('cardholder-id');
+                        if (id) {
+                            purgeForm.append($('<input>', { 'type': 'hidden', 'name': 'cardholder_ids[]', 'value': id }));
+                        }
+                    }
+
+                    $('body').append(purgeForm);
+                    purgeForm.submit();
+                    purgeForm.remove();
+                
+                    $('#bulk-action-selector').val('-1');
+                
+                // NOTE: the delete is not hooked up.  Kept for future use.
+                } else if (action === 'delete') {   // only for vendor list
+                    e.preventDefault();
+
+                    if (!confirm('You are about to permanently DELETE ' + selectedNodes.length + ' vendor(s) and their associated credentials. This cannot be undone. Are you sure?')) {
+                        return;
+                    }
+
+                    const adminPostUrl = (typeof fsbhoa_ajax_settings !== 'undefined' && fsbhoa_ajax_settings.ajax_url)
+                        ? fsbhoa_ajax_settings.ajax_url.replace('admin-ajax.php', 'admin-post.php')
+                        : '/wp-admin/admin-post.php';
+
+                    const deleteForm = $('<form>', { 'method': 'POST', 'action': adminPostUrl });
+
+                    deleteForm.append($('<input>', { 'type': 'hidden', 'name': 'action', 'value': 'fsbhoa_bulk_vendor_action' }));
+                    deleteForm.append($('<input>', { 'type': 'hidden', 'name': '_wpnonce', 'value': $('#fsbhoa-bulk-action-form input[name="_wpnonce"]').val() }));
+                    deleteForm.append($('<input>', { 'type': 'hidden', 'name': 'bulk_action', 'value': 'delete' }));
+
+                    for (let i = 0; i < selectedNodes.length; i++) {
+                        const id = $(selectedNodes[i]).data('cardholder-id');
+                        if (id) {
+                            deleteForm.append($('<input>', { 'type': 'hidden', 'name': 'cardholder_ids[]', 'value': id }));
+                        }
+                    }
+
+                    $('body').append(deleteForm);
+                    deleteForm.submit();
+                    deleteForm.remove();
+
+                    $('#bulk-action-selector').val('-1');
                 }
             });
 
@@ -400,6 +461,9 @@ jQuery(function($) {
             self.vars.householdPanel.data('loaded-property', propertyId);
             self.vars.householdPanel.html('<p><em>Checking current occupants...</em></p>').slideDown();
 
+            const cardholderId = parseInt($('input[name="cardholder_id"]').val(), 10) || 0;
+            const resType = $('#resident_type').val() || '';
+
             $.ajax({
                 url: fsbhoa_ajax_settings.ajax_url,
                 type: 'POST',
@@ -407,20 +471,24 @@ jQuery(function($) {
                 data: {
                     action: 'fsbhoa_check_property_occupants',
                     property_id: propertyId,
+                    cardholder_id: cardholderId,
+                    resident_type: resType,
                     security: fsbhoa_ajax_settings.property_search_nonce
                 },
                 success: function(response) {
-					if (response.success) {
-						const occupants = response.data.occupants || response.data;
-						self.renderHouseholdPanel(occupants);
+                    if (response.success) {
+                        const occupants = response.data.occupants || response.data;
+                        self.renderHouseholdPanel(occupants);
 
-						if (response.data.vehicles_html) {
-							$('#fsbhoa-vehicles-section-container').replaceWith(response.data.vehicles_html);
-						}
-					} else {
-						self.vars.householdPanel.html('<p style="color:red;">Error checking occupants: ' + response.data + '</p>');
-					}
-				},
+                        // Only replace vehicles if we are ADDING a new cardholder picking an address.
+                        // For edit mode (cardholderId > 0), the page or change-type AJAX handles the table.
+                        if (response.data.vehicles_html && cardholderId === 0) {
+                            $('#fsbhoa-vehicles-section-container').replaceWith(response.data.vehicles_html);
+                        }
+                    } else {
+                        self.vars.householdPanel.html('<p style="color:red;">Error checking occupants: ' + response.data + '</p>');
+                    }
+                },
                 error: function() {
                     self.vars.householdPanel.html('<p style="color:red;">Network error checking occupants.</p>');
                 }
@@ -492,25 +560,6 @@ jQuery(function($) {
 
             let liveLandlords = liveOccupants.filter(occ => occ.resident_type === 'Landlord');
             let liveResidents = liveOccupants.filter(occ => occ.resident_type !== 'Landlord');
-
-            // --- ENFORCE SINGLE LANDLORD RULE ---
-            if (this.vars.residentTypeInput && this.vars.residentTypeInput.length) {
-                let otherLandlords = liveLandlords.filter(occ => !occ.is_placeholder);
-                let landlordExists = otherLandlords.length > 0;
-                let currentIsLandlord = liveLandlords.some(occ => (occ.is_placeholder && $('#resident_type').val() === 'Landlord') || parseInt(occ.id, 10) === currentEditId);
-                
-                if (landlordExists && !currentIsLandlord) {
-                    this.vars.residentTypeInput.find('option[value="Landlord"]').remove();
-                    if (this.vars.residentTypeInput.val() === 'Landlord') {
-                        this.vars.residentTypeInput.val('');
-                    }
-                } else {
-                    if (this.vars.residentTypeInput.find('option[value="Landlord"]').length === 0) {
-                        $('<option value="Landlord">Landlord</option>').insertAfter(this.vars.residentTypeInput.find('option[value="Resident Owner"]'));
-                    }
-                }
-            }
-
             let html = '';
 
             // --- HELPER: Derive Household Name from unique last names ---
@@ -577,11 +626,22 @@ jQuery(function($) {
                 return listHtml;
             };
 
+            // Helper to generate a debug button for a specific household ID
+            let getDebugBtn = (list) => {
+                let validOcc = list.find(occ => occ.household_id && parseInt(occ.household_id, 10) > 0);
+                let hhId = validOcc ? validOcc.household_id : 0;
+                return `
+                    <button type="button" class="fsbhoa-copy-hh-debug-btn" data-household-id="${hhId}" title="Copy this household diagnostic table to clipboard" style="background: none; border: none; cursor: pointer; padding: 2px 5px; vertical-align: middle; color: #666;">
+                        <span class="dashicons dashicons-clipboard" style="font-size: 16px; width: 16px; height: 16px;"></span>
+                    </button>
+                `;
+            };
+
             // --- 1. RENDER LANDLORDS FIRST (BLUE BOX) ---
             if (liveLandlords.length > 0) {
                 html += '<div style="background: #eaf1f8; border: 1px solid #2271b1; padding: 6px 10px; border-radius: 4px; margin-bottom: 8px;">';
                 html += '<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2271b1; padding-bottom: 3px; margin-bottom: 6px;">';
-                html += '<p style="margin:0; font-weight: 600; color: #2271b1;">Landlord / Owner' + deriveHouseholdName(liveLandlords) + '</p>';
+                html += '<p style="margin:0; font-weight: 600; color: #2271b1;">Landlord' + deriveHouseholdName(liveLandlords) + getDebugBtn(liveLandlords) + '</p>';
                 html += '</div>';
                 html += buildListItems(liveLandlords);
                 html += '</div>';
@@ -590,7 +650,7 @@ jQuery(function($) {
             // --- 2. RENDER LIVE RESIDENTS SECOND (GREEN BOX) ---
             html += '<div style="background: #e6f4ea; border: 1px solid #137333; padding: 6px 10px; border-radius: 4px; margin-bottom: 8px;">';
             html += '<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #137333; padding-bottom: 3px; margin-bottom: 6px;">';
-            html += '<p style="margin:0; font-weight: 600; color: #137333;">Current Residents' + deriveHouseholdName(liveResidents) + '</p>';
+            html += '<p style="margin:0; font-weight: 600; color: #137333;">Current Residents' + deriveHouseholdName(liveResidents) + getDebugBtn(liveResidents) + '</p>';
             html += '<a href="' + getAddUrl() + '" style="text-decoration: none; font-size: 13px; font-weight: 600; color: #137333;">+ Add Resident</a>';
             html += '</div>';
             html += buildListItems(liveResidents);
@@ -623,6 +683,8 @@ jQuery(function($) {
         handleResidentTypeChange: function() {
             if (!this.vars.residentTypeInput) return;
 
+            // Store the initial/current type so the user can cancel a change and revert cleanly
+            this.vars.residentTypeInput.data('current-type', this.vars.residentTypeInput.val());
             const selectedType = this.vars.residentTypeInput.val();
 
             // 1. Existing Contractor Logic
@@ -728,12 +790,66 @@ jQuery(function($) {
             formContainer.on('click', '#print-id-card-button', (e) => { e.preventDefault(); this.handlePrintIdClick(); });
             formContainer.on('click', '#fsbhoa-add-vehicle-row-btn', (e) => this.handleAddVehicleRow(e));
             // Dynamically reload household panel when resident type changes to catch standalone types
-            formContainer.on('change', '#resident_type', () => {
-                let propId = this.vars.propertyIdHiddenInput.val();
-                if (propId) {
-                    this.vars.householdPanel.data('loaded-property', ''); // Clear cache to force redraw
-                    this.fetchPropertyOccupants(propId);
+            // Handle resident type changes and trigger household re-assignment for existing members
+            formContainer.on('change', '#resident_type', (e) => {
+                const $select = $(e.currentTarget);
+                const newType = $select.val();
+                const cardholderId = parseInt($('input[name="cardholder_id"]').val(), 10) || 0;
+                const propId = this.vars.propertyIdHiddenInput.val();
+
+                // If creating a brand new cardholder (not yet saved), just refresh the preview panel
+                if (!cardholderId) {
+                    if (propId) {
+                        this.vars.householdPanel.data('loaded-property', '');
+                        this.fetchPropertyOccupants(propId);
+                    }
+                    return;
                 }
+
+                if (!confirm("Changing resident type may reassign this person's household and vehicles. Proceed?")) {
+                    // Revert to previous value if canceled
+                    $select.val($select.data('current-type') || 'Resident Owner');
+                    return;
+                }
+
+                $select.prop('disabled', true);
+
+                $.ajax({
+                    url: fsbhoa_ajax_settings.ajax_url,
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'fsbhoa_ajax_change_resident_type',
+                        cardholder_id: cardholderId,
+                        new_type: newType,
+                        security: fsbhoa_ajax_settings.property_search_nonce
+                    },
+                    success: (response) => {
+                        $select.prop('disabled', false);
+                        if (response.success) {
+                            $select.data('current-type', newType);
+
+                            // Update vehicle table with the new household's vehicles
+                            if (response.data.vehicles_html) {
+                                $('#fsbhoa-vehicles-section-container').replaceWith(response.data.vehicles_html);
+                            }
+
+                            // Force-refresh the household panel to show them in the Landlord box
+                            if (propId) {
+                                this.vars.householdPanel.data('loaded-property', '');
+                                this.fetchPropertyOccupants(propId);
+                            }
+                        } else {
+                            alert('Failed to update resident type: ' + response.data);
+                            $select.val($select.data('current-type') || 'Resident Owner');
+                        }
+                    },
+                    error: () => {
+                        $select.prop('disabled', false);
+                        alert('Network error while updating resident type.');
+                        $select.val($select.data('current-type') || 'Resident Owner');
+                    }
+                });
             });
             this.vars.cardholderForm.on('submit', (e) => this.handleFormValidation(e));
 
@@ -1003,7 +1119,119 @@ jQuery(function($) {
                     }
                 });
             });
+
+            // 5. Instant Purge Button Handler
+            this.vars.householdPanel.on('click', '.fsbhoa-instant-purge-btn', (e) => {
+                e.preventDefault();
+                let btn = $(e.currentTarget);
+                let cardholderId = btn.data('id');
+                let targetName = btn.data('name');
+                let propertyId = this.vars.propertyIdHiddenInput.val();
+
+                if (!confirm(`Are you sure you want to permanently purge "${targetName}"? \n\nThey will be removed from this view forever, but their historical logs will remain in the database. This CANNOT be undone.`)) {
+                    return;
+                }
+
+                btn.prop('disabled', true).text('Purging...');
+
+                $.ajax({
+                    url: fsbhoa_ajax_settings.ajax_url,
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'fsbhoa_ajax_purge_cardholder',
+                        cardholder_id: cardholderId,
+                        security: fsbhoa_ajax_settings.property_search_nonce
+                    },
+                    success: (response) => {
+                        if (response.success) {
+                            let listItem = btn.closest('li');
+                            listItem.css({'text-decoration': 'line-through', 'color': '#999'}).fadeOut(400, () => {
+                                this.vars.householdPanel.data('loaded-property', '');
+                                this.fetchPropertyOccupants(propertyId);
+                            });
+                        } else {
+                            alert('Failed to purge: ' + response.data);
+                            btn.prop('disabled', false).text('Purge');
+                        }
+                    },
+                    error: () => {
+                        alert('Network error during purge.');
+                        btn.prop('disabled', false).text('Purge');
+                    }
+                });
+            });
+
+            // 6. Copy Household Diagnostic Table to Clipboard
+            this.vars.householdPanel.on('click', '.fsbhoa-copy-hh-debug-btn', (e) => {
+                e.preventDefault();
+                const $btn = $(e.currentTarget);
+                const propId = this.vars.propertyIdHiddenInput.val();
+                const hhId = parseInt($btn.data('household-id'), 10) || 0;
+
+                if (!propId) {
+                    alert('No property selected.');
+                    return;
+                }
+
+                $btn.css('opacity', '0.4');
+
+                $.ajax({
+                    url: fsbhoa_ajax_settings.ajax_url,
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'fsbhoa_copy_household_debug',
+                        property_id: propId,
+                        household_id: hhId,
+                        security: fsbhoa_ajax_settings.property_search_nonce
+                    },
+                    success: (response) => {
+                        $btn.css('opacity', '1');
+                        if (response.success) {
+                            const textToCopy = response.data;
+
+                            const showCopiedState = () => {
+                                const $icon = $btn.find('.dashicons');
+                                $icon.removeClass('dashicons-clipboard').addClass('dashicons-yes-alt').css('color', '#137333');
+                                setTimeout(() => {
+                                    $icon.removeClass('dashicons-yes-alt').addClass('dashicons-clipboard').css('color', '#666');
+                                }, 2000);
+                            };
+
+                            if (navigator.clipboard && window.isSecureContext) {
+                                navigator.clipboard.writeText(textToCopy).then(showCopiedState).catch(() => {
+                                    prompt("Copy to clipboard: Ctrl+C, Enter", textToCopy);
+                                });
+                            } else {
+                                const textArea = document.createElement("textarea");
+                                textArea.value = textToCopy;
+                                textArea.style.position = "fixed";
+                                textArea.style.left = "-999999px";
+                                textArea.style.top = "-999999px";
+                                document.body.appendChild(textArea);
+                                textArea.focus();
+                                textArea.select();
+                                try {
+                                    document.execCommand('copy');
+                                    showCopiedState();
+                                } catch (err) {
+                                    prompt("Copy to clipboard: Ctrl+C, Enter", textToCopy);
+                                }
+                                document.body.removeChild(textArea);
+                            }
+                        } else {
+                            alert('Could not fetch debug data: ' + response.data);
+                        }
+                    },
+                    error: () => {
+                        $btn.css('opacity', '1');
+                        alert('Network error fetching debug info.');
+                    }
+                });
+            });
         },
+
 
         convertSvgToPng: function(svgText) {
             const canvas = document.createElement('canvas');

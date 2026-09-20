@@ -106,81 +106,119 @@ class Fsbhoa_Archived_Cardholder_Admin_Page {
 
 
     /**
-     * Renders the standard two-column card preview and details layout. (No changes needed here)
+     * Renders the archive detail layout using plugin hooks.
      */
     private function render_card_preview_layout( $cardholder, $property_address ) {
-        // --- Prepare display variables ---
-        $first_name = trim($cardholder['first_name'] ?? '');
-        $last_name = trim($cardholder['last_name'] ?? '');
-        $full_name = $first_name . ' ' . $last_name;
-        $title = trim($cardholder['title'] ?? '');
-        $photo_src = !empty($cardholder['photo']) ? 'data:image/jpeg;base64,' . base64_encode($cardholder['photo']) : '';
-        $subtitle_text = '';
-        if (!empty($title)) {
-            $subtitle_text = $title;
-        }
+        global $wpdb;
+
+        $first_name = trim( $cardholder['first_name'] ?? '' );
+        $last_name  = trim( $cardholder['last_name'] ?? '' );
+        $full_name  = trim( $first_name . ' ' . $last_name );
+        $title      = trim( $cardholder['title'] ?? '' );
+        $company    = trim( $cardholder['company'] ?? '' );
+        $is_vendor  = ( isset( $cardholder['cardholder_type'] ) && 'vendor' === $cardholder['cardholder_type'] );
 
         ?>
-        <div class="fsbhoa-print-page-wrapper">
-            <div class="fsbhoa-print-columns">
+        <style>
+            .fsbhoa-archive-columns {
+                display: flex;
+                gap: 30px;
+                align-items: flex-start;
+                margin-bottom: 2em;
+            }
+            .fsbhoa-archive-badge-col {
+                flex: 0 0 240px;
+            }
+            .fsbhoa-archive-details-col {
+                flex: 1;
+            }
+            .fsbhoa-details-box {
+                background: #fdfdfd;
+                border: 1px solid #ccd0d4;
+                padding: 15px 20px;
+                border-radius: 4px;
+                box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            }
+            .fsbhoa-details-box p {
+                margin: 0 0 8px;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+            .fsbhoa-details-box p:last-child {
+                margin-bottom: 0;
+            }
+            @media (max-width: 600px) {
+                .fsbhoa-archive-columns {
+                    flex-direction: column;
+                }
+                .fsbhoa-archive-badge-col {
+                    width: 100%;
+                }
+            }
+        </style>
 
-                <div class="fsbhoa-card-preview-container">
-                    <h3>Card Preview</h3>
-                    <div class="id-card-container">
-                        <div class="id-card-body">
-                            <div class="id-card-photo">
-                                <?php if ($photo_src): ?>
-                                    <img src="<?php echo esc_attr($photo_src); ?>" alt="Cardholder Photo">
-                                <?php endif; ?>
-                            </div>
-                            <div class="id-card-info">
-                                <p class="card-name"><?php echo esc_html($first_name); ?></p>
-                                <p class="card-name"><?php echo esc_html($last_name); ?></p>
-                                <?php if (!empty($subtitle_text)): ?>
-                                    <p class="card-subtitle"><?php echo esc_html($subtitle_text); ?></p>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
+        <div class="fsbhoa-archive-columns">
+
+            <!-- Left Column: Visual Badge (Hooked by Zebra) -->
+            <div class="fsbhoa-archive-badge-col">
+                <?php
+                /**
+                 * Hook for plugins to render a visual badge/card preview.
+                 * Zebra hooks in here.
+                 */
+                do_action( 'fsbhoa_render_card_preview', $cardholder['id'], $cardholder );
+                ?>
+            </div>
+
+            <!-- Right Column: Profile & Credentials -->
+            <div class="fsbhoa-archive-details-col">
+                <h3><?php esc_html_e( 'Cardholder Details', 'fsbhoa-ac' ); ?></h3>
+                <div class="fsbhoa-details-box">
+                    <p><strong><?php esc_html_e( 'Name:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( $full_name ); ?></p>
+                    <?php if ( ! empty( $cardholder['import_first_name'] ) || ! empty( $cardholder['import_last_name'] ) ) : ?>
+                        <p><strong><?php esc_html_e( 'Formal Name:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( trim( $cardholder['import_first_name'] . ' ' . $cardholder['import_last_name'] ) ); ?></p>
+                    <?php endif; ?>
+                    <?php if ( ! empty( $title ) ) : ?>
+                        <p><strong><?php esc_html_e( 'Title:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( $title ); ?></p>
+                    <?php endif; ?>
+                    <?php if ( $is_vendor && ! empty( $company ) ) : ?>
+                        <p><strong><?php esc_html_e( 'Company:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( $company ); ?></p>
+                    <?php else : ?>
+                        <p><strong><?php esc_html_e( 'Address:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( $property_address ?? 'N/A' ); ?></p>
+                    <?php endif; ?>
+
+                    <?php
+                    $creds = $wpdb->get_col( $wpdb->prepare(
+                        "SELECT CONCAT(credential_type, ': ', credential_value) FROM ac_credentials WHERE cardholder_id = %d",
+                        $cardholder['id']
+                    ) );
+                    $cred_string = empty( $creds ) ? 'N/A' : implode( ', ', $creds );
+                    ?>
+                    <p><strong><?php esc_html_e( 'Credentials:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( $cred_string ); ?></p>
+                    <p><strong><?php esc_html_e( 'Phone:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( ! empty( $cardholder['phone'] ) ? $cardholder['phone'] . ' (' . ( $cardholder['phone_type'] ?? 'Mobile' ) . ')' : 'N/A' ); ?></p>
+                    <p><strong><?php esc_html_e( 'Email:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( ! empty( $cardholder['email'] ) ? $cardholder['email'] : 'N/A' ); ?></p>
+                    <p><strong><?php esc_html_e( 'Type:', 'fsbhoa-ac' ); ?></strong> <?php echo esc_html( $is_vendor ? 'Vendor / Staff' : ( $cardholder['resident_type'] ?? 'Resident' ) ); ?></p>
+
+                    <?php
+                    /**
+                     * Hook for plugins to append details (e.g. DoorKing PIN status or access logs).
+                     */
+                    do_action( 'fsbhoa_archive_detail_extra_fields', $cardholder['id'], $cardholder );
+                    ?>
                 </div>
 
-                <div class="fsbhoa-cardholder-details-container">
-                    <h3>Cardholder Details</h3>
-                    <div class="details-box">
-                        <p><strong>Name:</strong> <?php echo esc_html($full_name); ?></p>
-                        <?php if (!empty($cardholder['import_first_name']) || !empty($cardholder['import_last_name'])): ?>
-                            <p><strong>Formal Name:</strong> <?php echo esc_html(trim($cardholder['import_first_name'] . ' ' . $cardholder['import_last_name'])); ?></p>
-                        <?php endif; ?>
-                         <?php if (!empty($title)): ?>
-                            <p><strong>Title:</strong> <?php echo esc_html($title); ?></p>
-                        <?php endif; ?>
-                        <p><strong>Address:</strong> <?php echo esc_html($property_address ?? 'N/A'); ?></p>
-                        <?php
-    global $wpdb;
-    $creds = $wpdb->get_col($wpdb->prepare("SELECT CONCAT(credential_type, ': ', credential_value) FROM ac_credentials WHERE cardholder_id = %d", $cardholder['id']));
-    $cred_string = empty($creds) ? 'N/A' : implode(', ', $creds);
-?>
-                        <p><strong>Credentials:</strong> <?php echo esc_html($cred_string); ?></p>
-                        <p><strong>Phone:</strong> <?php echo esc_html( !empty($cardholder['phone']) ? $cardholder['phone'] . ' (' . $cardholder['phone_type'] . ')' : 'N/A' ); ?></p>
-                        <p><strong>Email:</strong> <?php echo esc_html($cardholder['email'] ?? 'N/A'); ?></p>
-                        <p><strong>Resident Type:</strong> <?php echo esc_html($cardholder['resident_type'] ?? 'N/A'); ?></p>
-                    </div>
-                    
-                    <h3 style="margin-top: 1.5em;">Notes</h3>
-                    <form method="POST" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                        <input type="hidden" name="action" value="fsbhoa_update_archived_notes">
-                        <input type="hidden" name="cardholder_id" value="<?php echo esc_attr($cardholder['id']); ?>">
-                        <?php wp_nonce_field('fsbhoa_update_archived_notes_nonce'); ?>
-                        
-                        <textarea name="notes" rows="4" style="width: 100%;"><?php echo esc_textarea($cardholder['notes'] ?? ''); ?></textarea>
-                        
-                        <p class="submit" style="margin-top: 1em; padding-top: 0;">
-                            <button type="submit" class="button button-primary">Save Notes</button>
-                        </p>
-                    </form>
+                <h3 style="margin-top: 1.5em;"><?php esc_html_e( 'Notes', 'fsbhoa-ac' ); ?></h3>
+                <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                    <input type="hidden" name="action" value="fsbhoa_update_archived_notes">
+                    <input type="hidden" name="cardholder_id" value="<?php echo esc_attr( $cardholder['id'] ); ?>">
+                    <?php wp_nonce_field( 'fsbhoa_update_archived_notes_nonce' ); ?>
 
-                </div>
+                    <textarea name="notes" rows="4" style="width: 100%;"><?php echo esc_textarea( $cardholder['notes'] ?? '' ); ?></textarea>
 
+                    <p class="submit" style="margin-top: 1em; padding-top: 0;">
+                        <button type="submit" class="button button-primary"><?php esc_html_e( 'Save Notes', 'fsbhoa-ac' ); ?></button>
+                    </p>
+                </form>
             </div>
         </div>
         <?php

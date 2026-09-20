@@ -27,13 +27,6 @@ function fsbhoa_render_address_section( $form_data ) {
                     <option value="Resident Owner" <?php selected($resident_type, 'Resident Owner'); ?>>Resident Owner</option>
                     <option value="Landlord" <?php selected($resident_type, 'Landlord'); ?>>Landlord</option>
                     <option value="Tenant" <?php selected($resident_type, 'Tenant'); ?>>Tenant</option>
-                    <option value="Family Member" <?php selected($resident_type, 'Family Member'); ?>>Family Member</option>
-                    <option value="Property Manager" <?php selected($resident_type, 'Property Manager'); ?>>Property Manager</option>
-                    <option value="Contractor" <?php selected($resident_type, 'Contractor'); ?>>Contractor</option>
-                    <option value="Staff" <?php selected($resident_type, 'Staff'); ?>>Staff</option>
-                    <option value="Emergency" <?php selected($resident_type, 'Emergency'); ?>>Emergency</option>
-                    <option value="Delivery" <?php selected($resident_type, 'Delivery'); ?>>Delivery</option>
-                    <option value="Other" <?php selected($resident_type, 'Other'); ?>>Other</option>
                 </select>
             </div>
             <div class="form-field fsbhoa-checkbox-field">
@@ -54,32 +47,47 @@ function fsbhoa_render_address_section( $form_data ) {
  * @param array $form_data The sanitized form data.
  * @return array An array of error messages.
  */
- function fsbhoa_validate_address_data( $post_data ) {
-    $errors = array();
-    $sanitized_data = array();
-    $allowed_resident_types = array(
-        'Resident Owner', 'Landlord', 'Tenant', 'Family Member',
-        'Property Manager', 'Staff', 'Contractor', 'Emergency', 'Delivery', 'Other'
-    );
+function fsbhoa_validate_address_data( $post_data ) {
+    global $wpdb;
+    $errors = [];
+    $data   = [];
 
-    $sanitized_data['resident_type'] = isset($post_data['resident_type']) ? sanitize_text_field(wp_unslash($post_data['resident_type'])) : '';
-    $sanitized_data['property_id']   = isset($post_data['property_id']) && !empty($post_data['property_id']) ? absint($post_data['property_id']) : null;
+    $property_id = isset( $post_data['property_id'] ) ? absint( $post_data['property_id'] ) : 0;
 
-    // Check if address text was entered without selecting a valid ID from the autocomplete.
-    $property_address_display = isset($post_data['property_address_display']) ? trim(wp_unslash($post_data['property_address_display'])) : '';
-    if ( !empty($property_address_display) && empty($sanitized_data['property_id']) ) {
-        $errors['property_id'] = 'The address is not valid. Please select a property from the dropdown list or clear the field.';
-    }
-    if (empty($sanitized_data['property_id'])) {
-        $errors['property_id'] = 'A valid Property Address is required.';
-    }
-    
-    if ( empty($sanitized_data['resident_type']) || !in_array( $sanitized_data['resident_type'], $allowed_resident_types ) ) {
-        $errors['resident_type'] = 'A valid Resident Type is required.';
-    }
-    $sanitized_data['origin'] = isset($post_data['manual_override']) ? 'manual' : 'import';
+    // 1. Mandatory check: property_id must be provided
+    if ( ! $property_id ) {
+        $errors['property_id'] = __( 'A valid Property Address from the registered community roster is required.', 'fsbhoa-ac' );
+    } elseif ( 480 === $property_id ) {
+        // 2. Explicit exclusion: Lodge is reserved for non-residents
+        $errors['property_id'] = __( '"Lodge" is reserved for non-residents. Please manage staff and contractors via the Vendor page.', 'fsbhoa-ac' );
+    } else {
+        // 3. Strict DB existence check: Must exist in ac_property
+        $valid_property = $wpdb->get_var( $wpdb->prepare(
+            "SELECT property_id FROM ac_property WHERE property_id = %d LIMIT 1",
+            $property_id
+        ) );
 
-    return array( 'errors' => $errors, 'data' => $sanitized_data );
+        if ( ! $valid_property ) {
+            $errors['property_id'] = __( 'The selected property is not recognized in the community property roster.', 'fsbhoa-ac' );
+        } else {
+            $data['property_id'] = $property_id;
+        }
+    }
+
+    // Validate resident_type whitelist
+    $resident_type = isset( $post_data['resident_type'] ) ? sanitize_text_field( wp_unslash( $post_data['resident_type'] ) ) : '';
+    $allowed_types = [ 'Resident Owner', 'Landlord', 'Tenant' ];
+
+    if ( empty( $resident_type ) || ! in_array( $resident_type, $allowed_types, true ) ) {
+        $errors['resident_type'] = __( 'Please select a valid Resident Type (Resident Owner, Landlord, or Tenant).', 'fsbhoa-ac' );
+    } else {
+        $data['resident_type'] = $resident_type;
+    }
+
+    return [
+        'errors' => $errors,
+        'data'   => $data,
+    ];
 }
 
 

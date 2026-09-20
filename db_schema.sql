@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Sep 06, 2026 at 08:46 PM
+-- Generation Time: Sep 20, 2026 at 06:01 PM
 -- Server version: 11.8.6-MariaDB-0+deb13u1 from Debian
 -- PHP Version: 8.4.21
 
@@ -68,17 +68,19 @@ CREATE TABLE `ac_cardholders` (
   `id` int(11) NOT NULL,
   `first_name` varchar(100) DEFAULT NULL,
   `last_name` varchar(100) DEFAULT NULL,
+  `company` varchar(100) DEFAULT NULL,
   `title` varchar(50) DEFAULT NULL,
   `import_first_name` varchar(255) DEFAULT NULL,
   `import_last_name` varchar(255) DEFAULT NULL,
   `property_id` int(11) DEFAULT NULL,
-  `household_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `household_id` int(11) DEFAULT NULL,
   `email` varchar(255) DEFAULT NULL,
   `email_used` tinyint(1) NOT NULL DEFAULT 0,
   `phone` varchar(30) DEFAULT NULL,
   `phone_type` varchar(10) DEFAULT 'Mobile',
   `photo` longblob DEFAULT NULL,
-  `cardholder_status` varchar(20) DEFAULT 'active',
+  `cardholder_status` varchar(20) NOT NULL DEFAULT 'inactive',
+  `cardholder_type` enum('resident','vendor') NOT NULL DEFAULT 'resident',
   `notes` text DEFAULT NULL,
   `resident_type` varchar(50) DEFAULT 'Resident Owner',
   `origin` varchar(20) NOT NULL DEFAULT 'manual' COMMENT 'Indicates if the record was from a csv import or added manually',
@@ -126,15 +128,17 @@ CREATE TABLE `ac_controllers` (
 
 CREATE TABLE `ac_credentials` (
   `id` int(11) NOT NULL,
-  `cardholder_id` int(11) DEFAULT NULL,
-  `vehicle_id` int(11) DEFAULT NULL,
+  `cardholder_id` int(11) NOT NULL,
+  `vehicle_id` int(11) DEFAULT NULL COMMENT 'Optional: Link directly to a vehicle',
   `credential_type` varchar(50) NOT NULL,
-  `credential_value` varchar(100) NOT NULL,
-  `status` varchar(20) DEFAULT 'invalid',
-  `issue_date` date DEFAULT NULL,
-  `expiration_date` date NOT NULL DEFAULT '2099-12-31',
-  `created_at` timestamp NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+  `credential_value` varchar(50) NOT NULL,
+  `status` enum('active','disabled','inactive') NOT NULL DEFAULT 'inactive',
+  `issue_date` date DEFAULT curdate(),
+  `expiration_date` datetime DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -147,7 +151,7 @@ CREATE TABLE `ac_credential_types` (
   `type_code` varchar(50) NOT NULL,
   `description` varchar(255) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -217,10 +221,10 @@ CREATE TABLE `ac_group_permissions` (
 --
 
 CREATE TABLE `ac_households` (
-  `household_id` bigint(20) UNSIGNED NOT NULL,
+  `household_id` int(11) NOT NULL,
   `household_name` varchar(100) NOT NULL,
   `created_at` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -255,7 +259,7 @@ CREATE TABLE `ac_print_log` (
   `submitted_by_user` varchar(100) DEFAULT NULL COMMENT 'WordPress username who initiated the print',
   `submitted_at` datetime(3) NOT NULL DEFAULT current_timestamp(3),
   `updated_at` datetime(3) NOT NULL DEFAULT current_timestamp(3) ON UPDATE current_timestamp(3)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -335,8 +339,8 @@ CREATE TABLE `ac_task_list` (
 
 CREATE TABLE `ac_vehicles` (
   `vehicle_id` int(11) NOT NULL,
-  `household_id` bigint(20) UNSIGNED DEFAULT NULL,
-  `license_plate` varchar(20) NOT NULL,
+  `household_id` int(11) NOT NULL,
+  `license_plate` varchar(20) DEFAULT NULL,
   `plate_state` varchar(5) DEFAULT 'CA',
   `vehicle_type` varchar(50) DEFAULT 'Automobile' COMMENT 'e.g., Automobile, RV, Golf Cart',
   `make` varchar(50) DEFAULT NULL,
@@ -346,7 +350,7 @@ CREATE TABLE `ac_vehicles` (
   `lpr_access_enabled` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 if LPR opens gate',
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Indexes for dumped tables
@@ -384,7 +388,9 @@ ALTER TABLE `ac_cardholders`
   ADD KEY `idx_phone_type` (`phone_type`),
   ADD KEY `idx_card_status` (`cardholder_status`),
   ADD KEY `idx_resident_type` (`resident_type`),
-  ADD KEY `fk_ac_cardholders_household` (`household_id`);
+  ADD KEY `idx_household_id` (`household_id`),
+  ADD KEY `idx_cardholder_status` (`cardholder_status`),
+  ADD KEY `idx_cardholder_type_status` (`cardholder_type`,`cardholder_status`);
 
 --
 -- Indexes for table `ac_cardholder_groups`
@@ -406,10 +412,9 @@ ALTER TABLE `ac_controllers`
 --
 ALTER TABLE `ac_credentials`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `cardholder_id` (`cardholder_id`),
-  ADD KEY `credential_value` (`credential_value`),
-  ADD KEY `credential_type` (`credential_type`),
-  ADD KEY `idx_vehicle_id` (`vehicle_id`);
+  ADD KEY `idx_type_value` (`credential_type`,`credential_value`),
+  ADD KEY `idx_cred_cardholder` (`cardholder_id`),
+  ADD KEY `idx_cred_vehicle` (`vehicle_id`);
 
 --
 -- Indexes for table `ac_credential_types`
@@ -502,7 +507,8 @@ ALTER TABLE `ac_task_list`
 --
 ALTER TABLE `ac_vehicles`
   ADD PRIMARY KEY (`vehicle_id`),
-  ADD UNIQUE KEY `idx_license_plate_state` (`license_plate`,`plate_state`);
+  ADD KEY `idx_license_plate_state` (`license_plate`,`plate_state`),
+  ADD KEY `idx_vehicle_household` (`household_id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -566,7 +572,7 @@ ALTER TABLE `ac_group_permissions`
 -- AUTO_INCREMENT for table `ac_households`
 --
 ALTER TABLE `ac_households`
-  MODIFY `household_id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `household_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `ac_pending_changes`
@@ -618,7 +624,7 @@ ALTER TABLE `ac_access_log`
 -- Constraints for table `ac_cardholders`
 --
 ALTER TABLE `ac_cardholders`
-  ADD CONSTRAINT `fk_ac_cardholders_household` FOREIGN KEY (`household_id`) REFERENCES `ac_households` (`household_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_ac_cardholders_household` FOREIGN KEY (`household_id`) REFERENCES `ac_households` (`household_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_ac_cardholders_property` FOREIGN KEY (`property_id`) REFERENCES `ac_property` (`property_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
@@ -632,8 +638,9 @@ ALTER TABLE `ac_cardholder_groups`
 -- Constraints for table `ac_credentials`
 --
 ALTER TABLE `ac_credentials`
-  ADD CONSTRAINT `ac_credentials_ibfk_1` FOREIGN KEY (`credential_type`) REFERENCES `ac_credential_types` (`type_code`),
-  ADD CONSTRAINT `fk_credential_vehicle` FOREIGN KEY (`vehicle_id`) REFERENCES `ac_vehicles` (`vehicle_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_cred_cardholder` FOREIGN KEY (`cardholder_id`) REFERENCES `ac_cardholders` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_cred_type_code` FOREIGN KEY (`credential_type`) REFERENCES `ac_credential_types` (`type_code`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_cred_vehicle` FOREIGN KEY (`vehicle_id`) REFERENCES `ac_vehicles` (`vehicle_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `ac_doors`
@@ -661,9 +668,16 @@ ALTER TABLE `ac_print_log`
 ALTER TABLE `ac_task_list`
   ADD CONSTRAINT `fk_ac_task_list_controller` FOREIGN KEY (`controller_id`) REFERENCES `ac_controllers` (`controller_record_id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_task_list_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `ac_schedules` (`schedule_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `ac_vehicles`
+--
+ALTER TABLE `ac_vehicles`
+  ADD CONSTRAINT `fk_vehicle_household` FOREIGN KEY (`household_id`) REFERENCES `ac_households` (`household_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
 

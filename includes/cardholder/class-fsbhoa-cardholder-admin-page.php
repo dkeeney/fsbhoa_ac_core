@@ -124,7 +124,6 @@ class Fsbhoa_Cardholder_Admin_Page {
                 <input type="hidden" name="_wp_http_referer" value="<?php echo esc_url( remove_query_arg( 'message' ) ); ?>" />
                 <?php wp_nonce_field( $nonce_action, '_wpnonce' ); ?>
                 <?php
-                // We no longer use a table, just call the render functions for our sections
                 require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-address-section.php';
                 fsbhoa_render_address_section( $form_data );
 
@@ -187,7 +186,8 @@ class Fsbhoa_Cardholder_Admin_Page {
         $sql = "SELECT c.*, p.house_number, p.street_name
                 FROM {$cardholders_table} c
                 LEFT JOIN {$properties_table} p ON c.property_id = p.property_id
-                WHERE c.cardholder_status NOT IN ('archived', 'purged')";
+                WHERE c.cardholder_type = 'resident'
+                   AND c.cardholder_status NOT IN ('archived', 'purged')";
 
         $orderby = isset( $_REQUEST['orderby'] ) ? sanitize_sql_orderby( $_REQUEST['orderby'] ) : 'full_name';
         $order   = isset( $_REQUEST['order'] ) ? strtoupper( sanitize_key( $_REQUEST['order'] ) ) : 'ASC';

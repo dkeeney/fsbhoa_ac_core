@@ -63,6 +63,127 @@ function fsbhoa_archive_and_delete_cardholder( $cardholder_id ) {
 
 
 /**
+ * Universal helper to restore an archived cardholder.
+ * Resolves household placement, re-evaluates active status, restores groups_csv,
+ * re-activates credentials, logs changes, and fires the core lifecycle hook.
+ *
+ * @param int      $cardholder_id The ID of the cardholder to restore.
+ * @param int|null $target_household_id Optional explicit household ID. If null, auto-resolves.
+ * @return true|WP_Error True on success, WP_Error on failure.
+ */
+function fsbhoa_restore_cardholder( $cardholder_id, $target_household_id = null ) {
+    global $wpdb;
+    $cardholder_id = absint( $cardholder_id );
+
+    if ( ! $cardholder_id ) {
+        return new WP_Error( 'invalid_id', __( 'Invalid cardholder ID.', 'fsbhoa-ac' ) );
+    }
+
+    $table_cardholders = 'ac_cardholders';
+    $table_memberships = 'ac_cardholder_groups';
+
+    // 1. Fetch the cardholder record
+    $cardholder = $wpdb->get_row( $wpdb->prepare(
+        "SELECT id, property_id, household_id, groups_csv, cardholder_type FROM {$table_cardholders} WHERE id = %d",
+        $cardholder_id
+    ) );
+
+    if ( ! $cardholder ) {
+        return new WP_Error( 'not_found', __( 'Cardholder record not found.', 'fsbhoa-ac' ) );
+    }
+
+    // 2. Resolve Household Assignment
+    $final_household_id = $cardholder->household_id;
+
+    if ( null !== $target_household_id ) {
+        $final_household_id = absint( $target_household_id );
+    } elseif ( 'resident' === $cardholder->cardholder_type && ! empty( $cardholder->property_id ) ) {
+        // Auto-detect household based on current active occupants at this property
+        $active_resident = $wpdb->get_row( $wpdb->prepare(
+            "SELECT household_id FROM {$table_cardholders}
+             WHERE property_id = %d
+               AND cardholder_status IN ('active', 'inactive')
+               AND cardholder_type = 'resident'
+               AND household_id IS NOT NULL AND household_id > 0
+             LIMIT 1",
+            $cardholder->property_id
+        ) );
+
+        if ( $active_resident && ! empty( $active_resident->household_id ) ) {
+            $final_household_id = absint( $active_resident->household_id );
+        } elseif ( empty( $final_household_id ) ) {
+            $wpdb->insert( 'ac_households', [ 'household_name' => 'Restored Household' ] );
+            $final_household_id = $wpdb->insert_id;
+        }
+    }
+
+    // 3. Determine Status: 'active' if they possess valid credentials, else 'inactive'
+    $has_credential = $wpdb->get_var( $wpdb->prepare(
+        "SELECT id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1",
+        $cardholder_id
+    ) );
+    $new_status = $has_credential ? 'active' : 'inactive';
+
+    // 4. Update the cardholder row
+    $updated = $wpdb->update(
+        $table_cardholders,
+        [
+            'cardholder_status' => $new_status,
+            'household_id'      => $final_household_id,
+            'deleted_at'        => null,
+            'groups_csv'        => null,
+        ],
+        [ 'id' => $cardholder_id ],
+        [ '%s', '%d', null, null ],
+        [ '%d' ]
+    );
+
+    if ( false === $updated ) {
+        return new WP_Error( 'db_error', 'Database error restoring cardholder: ' . $wpdb->last_error );
+    }
+
+    // 5. Restore Group Memberships from groups_csv backup
+    if ( ! empty( $cardholder->groups_csv ) ) {
+        $wpdb->delete( $table_memberships, [ 'cardholder_id' => $cardholder_id ] );
+        $group_ids = explode( ',', $cardholder->groups_csv );
+        foreach ( $group_ids as $gid ) {
+            $gid = absint( trim( $gid ) );
+            if ( $gid > 0 ) {
+                $wpdb->insert( $table_memberships, [
+                    'cardholder_id' => $cardholder_id,
+                    'group_id'      => $gid,
+                ], [ '%d', '%d' ] );
+            }
+        }
+    }
+
+    // 6. Reactivate Credentials in Database
+    $wpdb->update(
+        'ac_credentials',
+        [ 'status' => 'active' ],
+        [ 'cardholder_id' => $cardholder_id ],
+        [ '%s' ],
+        [ '%d' ]
+    );
+
+    // 7. Fire the Core Lifecycle Hook (DoorKing synchronizes DIR, ENTRY, OPT_IN here)
+    do_action( 'fsbhoa_core_cardholder_restored', $cardholder_id );
+
+    // 8. Log the Change for hardware sync
+    $creds = $wpdb->get_col( $wpdb->prepare(
+        "SELECT credential_value FROM ac_credentials WHERE cardholder_id = %d AND status = 'active'",
+        $cardholder_id
+    ) );
+    $log_data = json_encode( [
+        'credentials' => empty( $creds ) ? '' : implode( ',', $creds ),
+        'action'      => 'cardholder_restored',
+    ] );
+    fsbhoa_log_pending_change( 'cardholder', $cardholder_id, $log_data );
+
+    return true;
+}
+
+/**
  * Shared helper to merge a source cardholder into a destination cardholder.
  * Encapsulates full transaction logic, credential reassignment, group merging,
  * photo transfer, access log re-linking, source purging, and property cleanup.
@@ -99,6 +220,11 @@ function fsbhoa_merge_cardholders( $destination_id, $source_id ) {
     if ( ! $dest_record ) {
         $wpdb->query( 'ROLLBACK' );
         return new WP_Error( 'destination_not_found', 'Could not find or lock the destination record.' );
+    }
+    if ( ( isset( $source_record['cardholder_type'] ) && $source_record['cardholder_type'] !== 'resident' ) ||
+         ( isset( $dest_record['cardholder_type'] ) && $dest_record['cardholder_type'] !== 'resident' ) ) {
+        $wpdb->query( 'ROLLBACK' );
+        return new WP_Error( 'invalid_cardholder_type', 'Merge operations are restricted to resident cardholders only.' );
     }
 
     // 1. Move credentials from source to destination
@@ -212,10 +338,110 @@ function fsbhoa_merge_cardholders( $destination_id, $source_id ) {
         }
     }
 
+
+    // Broadcast merge event before commit so plugins can resolve credentials in the same transaction
+    do_action( 'fsbhoa_core_cardholders_merged', $destination_id, $source_id, $dest_record, $source_record );
+
     $wpdb->query( 'COMMIT' );
     fsbhoa_log_pending_change( 'cardholder', $destination_id );
 
     return true;
+}
+
+/**
+ * Changes a cardholder's resident type and moves them to the appropriate household.
+ *
+ * @param int    $cardholder_id The ID of the cardholder.
+ * @param string $new_type      The new resident type (e.g. 'Landlord', 'Tenant', etc.).
+ * @return array|WP_Error      Array with new household details on success, WP_Error on failure.
+ */
+function fsbhoa_change_cardholder_resident_type( $cardholder_id, $new_type ) {
+    global $wpdb;
+
+    $cardholder_id = absint( $cardholder_id );
+    $new_type      = sanitize_text_field( $new_type );
+
+    if ( ! $cardholder_id || empty( $new_type ) ) {
+        return new WP_Error( 'invalid_input', __( 'Invalid cardholder ID or resident type.', 'fsbhoa-ac' ) );
+    }
+
+    $current = $wpdb->get_row( $wpdb->prepare(
+        "SELECT id, property_id, household_id, last_name, resident_type FROM ac_cardholders WHERE id = %d",
+        $cardholder_id
+    ) );
+
+    if ( ! $current ) {
+        return new WP_Error( 'not_found', __( 'Cardholder not found.', 'fsbhoa-ac' ) );
+    }
+
+    $is_landlord         = ( strcasecmp( $new_type, 'Landlord' ) === 0 );
+    $target_household_id = 0;
+
+    // 1. Find existing target household matching the new role at this property
+    if ( $is_landlord ) {
+        $target_household_id = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT household_id FROM ac_cardholders
+             WHERE property_id = %d
+               AND cardholder_status IN ('active', 'inactive')
+               AND resident_type = 'Landlord'
+               AND id != %d
+               AND household_id IS NOT NULL
+             LIMIT 1",
+            $current->property_id, $cardholder_id
+        ) );
+    } else {
+        $target_household_id = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT household_id FROM ac_cardholders
+             WHERE property_id = %d
+               AND cardholder_status IN ('active', 'inactive')
+               AND resident_type != 'Landlord'
+               AND resident_type NOT IN ('Contractor', 'Staff', 'Other', 'Emergency', 'Delivery')
+               AND id != %d
+               AND household_id IS NOT NULL
+             LIMIT 1",
+            $current->property_id, $cardholder_id
+        ) );
+    }
+
+    // 2. Provision a new household if none exists for this role
+    if ( empty( $target_household_id ) ) {
+        $suffix = $is_landlord ? " (Landlord)" : " Household";
+        $household_name = sanitize_text_field( ($current->last_name ?: 'New') . $suffix );
+        $wpdb->insert( 'ac_households', [ 'household_name' => $household_name ] );
+        $target_household_id = (int) $wpdb->insert_id;
+
+        if ( ! $target_household_id ) {
+            return new WP_Error( 'db_error', __( 'Failed to create new household.', 'fsbhoa-ac' ) );
+        }
+    }
+
+    // 3. Update the cardholder record
+    $wpdb->update(
+        'ac_cardholders',
+        [
+            'resident_type' => $new_type,
+            'household_id'  => $target_household_id,
+        ],
+        [ 'id' => $cardholder_id ]
+    );
+
+    // 4. Move vehicles tied to this cardholder's credentials to the target household
+    $wpdb->query( $wpdb->prepare(
+        "UPDATE ac_vehicles v
+         JOIN ac_credentials cred ON cred.vehicle_id = v.vehicle_id
+         SET v.household_id = %d
+         WHERE cred.cardholder_id = %d",
+        $target_household_id, $cardholder_id
+    ) );
+
+    // 5. Fire core action hook for sub-plugins/hardware sync
+    do_action( 'fsbhoa_core_cardholder_household_changed', $cardholder_id, $target_household_id, $current->household_id );
+
+    return [
+        'cardholder_id' => $cardholder_id,
+        'household_id'  => $target_household_id,
+        'resident_type' => $new_type,
+    ];
 }
 
 

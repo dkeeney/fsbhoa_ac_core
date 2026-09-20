@@ -14,6 +14,7 @@ function fsbhoa_render_archived_cardholder_list_view() {
              FROM ac_cardholders c
              LEFT JOIN ac_property p ON c.property_id = p.property_id
              WHERE c.cardholder_status = %s
+               AND c.cardholder_type = 'resident'
              ORDER BY c.deleted_at DESC",
             'archived'
         ),

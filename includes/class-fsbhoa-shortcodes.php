@@ -10,60 +10,18 @@ class Fsbhoa_Shortcodes {
 
     public function __construct() {
         add_shortcode( 'fsbhoa_cardholder_management', array( $this, 'render_cardholder_management_shortcode' ) );
-        add_shortcode( 'fsbhoa_print_card', array( $this, 'render_print_card_shortcode' ) );
-        add_shortcode( 'fsbhoa_hardware_management', array( $this, 'render_hardware_management_shortcode' ) );
         add_shortcode( 'fsbhoa_live_monitor', array( $this, 'render_live_monitor_shortcode' ) );
         add_shortcode( 'fsbhoa_reports', array( $this, 'render_reports_shortcode' ) );
         add_shortcode( 'fsbhoa_usage_analytics', array( $this, 'render_analytics_shortcode' ) );
-        add_shortcode( 'fsbhoa_amenity_management', array( $this, 'render_amenity_management_shortcode' ) );
         add_shortcode( 'fsbhoa_cardholder_report', array( $this, 'render_cardholder_report_shortcode' ) );
         add_shortcode( 'fsbhoa_task_list', array( $this, 'render_task_list_shortcode' ) );
         add_shortcode( 'fsbhoa_archived_cardholders', array( $this, 'render_archived_cardholders_shortcode' ) );
         add_shortcode( 'fsbhoa_schedules_page', [$this, 'render_schedules_page_shortcode'] );
+        add_shortcode( 'fsbhoa_vendor_management', array( $this, 'render_vendor_management_shortcode' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_shortcode_assets' ) );
         add_action( 'wp_body_open', array( $this, 'display_sync_banner' ) );
     }
 
-    public function render_cardholder_management_shortcode( $atts ) {
-        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
-            return '<div class="notice notice-error"><p>' .
-               esc_html__( 'Access Denied: This tool is for IT Committee use only.', 'fsbhoa-ac' ) .
-               ' <a href="' . home_url() . '">Return to Home Page</a></p></div>';
-        }
-
-        $current_view = 'cardholders';
-
-        if ( isset( $_GET['view'] ) ) {
-            $current_view = sanitize_key( $_GET['view'] );
-        } else {
-            $atts = shortcode_atts(
-                [ 'view' => 'cardholders' ],
-                $atts,
-                'fsbhoa_cardholder_management'
-            );
-            $current_view = sanitize_key( $atts['view'] );
-        }
-
-        ob_start();
-
-        if ( $current_view === 'properties' ) {
-            if ( class_exists('Fsbhoa_Property_Admin_Page') ) {
-                $property_admin_page = new Fsbhoa_Property_Admin_Page();
-                $property_admin_page->render_page();
-            } else {
-                echo '<p>' . esc_html__( 'Error: Property management class not found.', 'fsbhoa-ac' ) . '</p>';
-            }
-        } else {
-            if ( class_exists('Fsbhoa_Cardholder_Admin_Page') ) {
-                $cardholder_admin_page = new Fsbhoa_Cardholder_Admin_Page();
-                $cardholder_admin_page->render_page();
-            } else {
-                echo '<p>' . esc_html__( 'Error: Cardholder management class not found.', 'fsbhoa-ac' ) . '</p>';
-            }
-        }
-
-        return ob_get_clean();
-    }
 
     public function enqueue_shortcode_assets() {
         global $post;
@@ -93,8 +51,9 @@ class Fsbhoa_Shortcodes {
         ]);
 
 
-        // ASSETS FOR: [fsbhoa_cardholder_management]
-        if ( has_shortcode( $post->post_content, 'fsbhoa_cardholder_management' ) ) {
+        // ASSETS FOR: [fsbhoa_cardholder_management] and [fsbhoa_vendor_management]
+        if ( has_shortcode( $post->post_content, 'fsbhoa_cardholder_management' ) 
+          || has_shortcode( $post->post_content, 'fsbhoa_vendor_management' ) ) {
             wp_enqueue_script('jquery-ui-autocomplete');
             wp_enqueue_script('jquery-ui-dialog');
 
@@ -150,26 +109,6 @@ class Fsbhoa_Shortcodes {
                 'notes_nonce' => wp_create_nonce('fsbhoa_archived_notes_nonce')
             );
             wp_localize_script($handle, 'fsbhoa_ajax_settings', $ajax_settings);
-        }
-
-        // ASSETS FOR: [fsbhoa_print_card]
-        if ( has_shortcode( $post->post_content, 'fsbhoa_print_card' ) ) {
-            wp_enqueue_style('fsbhoa-print-styles', FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-print-styles.css', array('fsbhoa-shared-styles'), FSBHOA_AC_PLUGIN_VERSION);
-            wp_enqueue_script('fsbhoa-print-workflow', FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-print-workflow.js', array('jquery'), FSBHOA_AC_PLUGIN_VERSION, true);
-            wp_localize_script('fsbhoa-print-workflow', 'fsbhoa_print_vars', array(
-                'ajax_url' => admin_url('admin-ajax.php'), 
-                'nonce'    => wp_create_nonce('fsbhoa_print_card_nonce'), 
-                'cardholder_page_url' => get_permalink(get_page_by_path('cardholder'))
-            ));
-        }
-
-        // ASSETS FOR: [fsbhoa_hardware_management] (Controllers, Gates, Tasks)
-        if ( has_shortcode( $post->post_content, 'fsbhoa_hardware_management' ) ) {
-            // Needs DataTables for its lists
-            wp_enqueue_style('datatables-style', FSBHOA_AC_PLUGIN_URL . 'assets/vendor/dataTables.dataTables.css', array(), '2.0.8');
-            wp_enqueue_script('datatables-script', FSBHOA_AC_PLUGIN_URL . 'assets/vendor/dataTables.js', array('jquery'), '2.0.8', true);
-
-
         }
 
 
@@ -240,32 +179,6 @@ class Fsbhoa_Shortcodes {
         }
 
 
-        // ASSETS FOR: [fsbhoa_amenity_management]
-        if ( has_shortcode( $post->post_content, 'fsbhoa_amenity_management' ) ) {
-            wp_enqueue_style(
-                'fsbhoa-amenity-styles', 
-                FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-amenity-styles.css', 
-                array('fsbhoa-shared-styles'), 
-                FSBHOA_AC_PLUGIN_VERSION,
-            );
-            wp_enqueue_media();
-            wp_enqueue_script(
-                'fsbhoa-amenity-admin', 
-                FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-amenity-admin.js', 
-                array('jquery'), 
-                FSBHOA_AC_PLUGIN_VERSION, 
-                true,
-            );
-            wp_localize_script(
-                'fsbhoa-amenity-admin',
-                'fsbhoa_amenity_data',
-                array(
-                    'ajax_url' => admin_url('admin-ajax.php'),
-                    'nonce'    => wp_create_nonce('fsbhoa_amenity_nonce')
-                )
-            );
-        }
-
         // ASSETS FOR: [fsbhoa_groups_page]
         if (has_shortcode($post->post_content, 'fsbhoa_groups_page')) {
             $css_path = FSBHOA_AC_PLUGIN_DIR . 'assets/css/fsbhoa-groups.css';
@@ -333,22 +246,55 @@ class Fsbhoa_Shortcodes {
                 FSBHOA_AC_PLUGIN_VERSION
             );
         }
+
+
     }
 
-    public function render_print_card_shortcode( $atts ) {
+
+    public function render_cardholder_management_shortcode( $atts ) {
         if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
-            return '<p>' . esc_html__( 'You do not have permission to view this page.', 'fsbhoa-ac' ) . '</p>';
+            return '<div class="notice notice-error"><p>' .
+               esc_html__( 'Access Denied: This tool is for IT Committee use only.', 'fsbhoa-ac' ) .
+               ' <a href="' . home_url() . '">Return to Home Page</a></p></div>';
+        }
+
+        $current_view = 'cardholders';
+
+        if ( isset( $_GET['view'] ) ) {
+            $current_view = sanitize_key( $_GET['view'] );
+        } else {
+            $atts = shortcode_atts(
+                [ 'view' => 'cardholders' ],
+                $atts,
+                'fsbhoa_cardholder_management'
+            );
+            $current_view = sanitize_key( $atts['view'] );
         }
 
         ob_start();
-        if ( function_exists('fsbhoa_render_printable_card_view') ) {
-            fsbhoa_render_printable_card_view();
+
+        if ( $current_view === 'properties' ) {
+            if ( class_exists('Fsbhoa_Property_Admin_Page') ) {
+                $property_admin_page = new Fsbhoa_Property_Admin_Page();
+                $property_admin_page->render_page();
+            } else {
+                echo '<p>' . esc_html__( 'Error: Property management class not found.', 'fsbhoa-ac' ) . '</p>';
+            }
         } else {
-            echo '<div class="notice notice-error"><p>The Zebra Printer module is not active. Please enable it in Plugins.</p></div>';
+            if ( class_exists('Fsbhoa_Cardholder_Admin_Page') ) {
+                $cardholder_admin_page = new Fsbhoa_Cardholder_Admin_Page();
+                $cardholder_admin_page->render_page();
+            } else {
+                echo '<p>' . esc_html__( 'Error: Cardholder management class not found.', 'fsbhoa-ac' ) . '</p>';
+            }
         }
+
         return ob_get_clean();
     }
 
+
+
+    /**************  dead code?
     public function render_hardware_management_shortcode( $atts ) {
         if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
             return '<p>' . esc_html__( 'You do not have sufficient permissions.', 'fsbhoa-ac' ) . '</p>';
@@ -367,6 +313,7 @@ class Fsbhoa_Shortcodes {
         do_action("fsbhoa_hardware_management_view_{$current_view}");
         return ob_get_clean();
     }
+    ***************/
 
     public function render_live_monitor_shortcode( $atts ) {
         if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
@@ -515,6 +462,33 @@ class Fsbhoa_Shortcodes {
         ob_start();
         $schedules_page = new Fsbhoa_Schedules_Admin_Page();
         $schedules_page->render_page();
+        return ob_get_clean();
+    }
+
+    /**
+     * Renders the Vendor & Staff management interface.
+     *
+     * @param array $atts Shortcode attributes.
+     * @return string Rendered HTML.
+     */
+    public function render_vendor_management_shortcode( $atts ) {
+        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            return '<div class="notice notice-error"><p>' .
+                esc_html__( 'Access Denied: This tool is for authorized staff only.', 'fsbhoa-ac' ) .
+                ' <a href="' . esc_url( home_url() ) . '">Return to Home Page</a></p></div>';
+        }
+
+        ob_start();
+
+        if ( class_exists( 'Fsbhoa_Vendor_Admin_Page' ) ) {
+            $vendor_admin_page = new Fsbhoa_Vendor_Admin_Page();
+            $vendor_admin_page->render_page();
+        } else {
+            echo '<div class="notice notice-warning"><p>' .
+                esc_html__( 'Vendor management class not loaded.', 'fsbhoa-ac' ) .
+                '</p></div>';
+        }
+
         return ob_get_clean();
     }
 

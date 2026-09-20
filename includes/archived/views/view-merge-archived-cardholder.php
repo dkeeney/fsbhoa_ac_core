@@ -17,7 +17,9 @@ function fsbhoa_render_merge_cardholder_view() {
         "SELECT c.*, p.street_address 
          FROM ac_cardholders c 
          LEFT JOIN ac_property p ON c.property_id = p.property_id 
-         WHERE c.id = %d AND c.cardholder_status = 'archived'", 
+         WHERE c.id = %d 
+           AND c.cardholder_status = 'archived'
+           AND c.cardholder_type = 'resident'", 
         $source_id
     ));
 

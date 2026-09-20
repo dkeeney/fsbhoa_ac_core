@@ -3,6 +3,7 @@ if ( ! defined( 'WPINC' ) ) { die; }
 
 function fsbhoa_render_vehicles_section( $form_data ) {
 	global $wpdb;
+
 	$cardholder_id = isset( $form_data['id'] ) ? absint( $form_data['id'] ) : 0;
 	$household_id  = isset( $form_data['household_id'] ) ? absint( $form_data['household_id'] ) : 0;
 	$vehicles      = [];

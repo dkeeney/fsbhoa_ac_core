@@ -29,6 +29,8 @@ class Fsbhoa_Cardholder_Actions {
         add_action('wp_ajax_fsbhoa_ajax_restore_cardholder', array($this, 'ajax_restore_cardholder_callback'));
         add_action('wp_ajax_fsbhoa_ajax_save_cardholder', array($this, 'ajax_save_cardholder_callback'));
         add_action('wp_ajax_fsbhoa_ajax_merge_cardholders', array($this, 'ajax_merge_cardholders_callback'));
+        add_action( 'wp_ajax_fsbhoa_ajax_change_resident_type', [ $this, 'ajax_change_resident_type_callback' ] );
+        add_action( 'wp_ajax_fsbhoa_copy_household_debug', [ $this, 'ajax_copy_household_debug_callback' ] );
     }
 
     public function ajax_search_properties_callback() {
@@ -39,7 +41,15 @@ class Fsbhoa_Cardholder_Actions {
         $results = array();
         if (strlen($search_term) >= 1) {
             $wildcard_search_term = '%' . $wpdb->esc_like($search_term) . '%';
-            $properties = $wpdb->get_results( $wpdb->prepare( "SELECT property_id, street_address FROM {$table_name} WHERE street_address LIKE %s ORDER BY street_address ASC LIMIT 20", $wildcard_search_term ), ARRAY_A );
+            $properties = $wpdb->get_results( $wpdb->prepare(
+                "SELECT property_id, street_address
+                 FROM {$table_name}
+                 WHERE street_address LIKE %s
+                   AND property_id != 480
+                 ORDER BY street_address ASC
+                 LIMIT 20",
+                $wildcard_search_term
+            ), ARRAY_A );
 
             if ( $wpdb->last_error ) {
                 error_log('FSBHOA AJAX Property Search DB Error: ' . $wpdb->last_error);
@@ -55,6 +65,7 @@ class Fsbhoa_Cardholder_Actions {
         }
         wp_send_json_success($results);
     }
+
 
 
     public function ajax_check_property_occupants() {
@@ -77,17 +88,50 @@ class Fsbhoa_Cardholder_Actions {
 			"SELECT id, first_name, last_name, cardholder_status, household_id, resident_type, origin
 			 FROM ac_cardholders
 			 WHERE property_id = %d
+               AND cardholder_type = 'resident'
 			   AND cardholder_status IN ('active', 'inactive', 'archived')
 			 ORDER BY cardholder_status ASC, first_name ASC",
 			$property_id
 		) );
 
-		// 2. Identify the active household ID (excluding landlords)
-		$household_id = 0;
-		foreach ( $occupants as $occ ) {
-			if ( $occ->cardholder_status !== 'archived' && $occ->resident_type !== 'Landlord' && ! empty( $occ->household_id ) ) {
-				$household_id = absint( $occ->household_id );
-				break;
+        // 2. Identify the active household ID based on target resident role
+        $current_cardholder_id = isset( $_POST['cardholder_id'] ) ? absint( $_POST['cardholder_id'] ) : 0;
+        $current_resident_type = isset( $_POST['resident_type'] ) ? sanitize_text_field( wp_unslash( $_POST['resident_type'] ) ) : '';
+        $is_landlord           = ( strcasecmp( $current_resident_type, 'Landlord' ) === 0 );
+
+        $household_id = 0;
+
+        // If editing an existing cardholder who already has a household, honor it directly
+        if ( $current_cardholder_id > 0 ) {
+            $household_id = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT household_id FROM ac_cardholders WHERE id = %d",
+                $current_cardholder_id
+            ) );
+        }
+
+        // If creating new or unassigned, find the matching household group at this property
+        if ( empty( $household_id ) ) {
+            foreach ( $occupants as $occ ) {
+                if ( $occ->cardholder_status === 'archived' || empty( $occ->household_id ) ) {
+                    continue;
+                }
+                $occ_is_landlord = ( strcasecmp( $occ->resident_type, 'Landlord' ) === 0 );
+
+                // Match Landlord to Landlord, Resident to Resident
+                if ( $is_landlord === $occ_is_landlord ) {
+                    $household_id = absint( $occ->household_id );
+                    break;
+                }
+            }
+        }
+
+		// Otherwise, fall back to the active resident household at this property
+		if ( empty( $household_id ) ) {
+			foreach ( $occupants as $occ ) {
+				if ( $occ->cardholder_status !== 'archived' && strcasecmp( $occ->resident_type, 'Landlord' ) !== 0 && ! empty( $occ->household_id ) ) {
+					$household_id = absint( $occ->household_id );
+					break;
+				}
 			}
 		}
 
@@ -98,8 +142,12 @@ class Fsbhoa_Cardholder_Actions {
 		}
 
 		ob_start();
-		fsbhoa_render_vehicles_section( [ 'household_id' => $household_id ] );
-		$vehicles_html = ob_get_clean();
+		fsbhoa_render_vehicles_section( [
+			'id'           => $current_cardholder_id,
+			'household_id' => $household_id,
+		] );
+        $vehicles_html = ob_get_clean();
+
 
 		wp_send_json_success( [
 			'occupants'     => $occupants,
@@ -142,106 +190,27 @@ class Fsbhoa_Cardholder_Actions {
     }
 
     public function ajax_restore_cardholder_callback() {
-        check_ajax_referer('fsbhoa_property_search_nonce', 'security');
+        check_ajax_referer( 'fsbhoa_property_search_nonce', 'security' );
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error('Permission denied.');
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Permission denied.' );
         }
 
-        $cardholder_id = isset($_POST['cardholder_id']) ? absint($_POST['cardholder_id']) : 0;
-        if (!$cardholder_id) {
-            wp_send_json_error('Invalid ID.');
+        $cardholder_id = isset( $_POST['cardholder_id'] ) ? absint( $_POST['cardholder_id'] ) : 0;
+        if ( ! $cardholder_id ) {
+            wp_send_json_error( 'Invalid ID.' );
         }
 
-        global $wpdb;
+        require_once plugin_dir_path( dirname( __DIR__ ) ) . 'includes/fsbhoa-cardholder-functions.php';
 
-        // 1. Get the cardholder's current details AND the group backup (groups_csv)
-        $cardholder = $wpdb->get_row($wpdb->prepare("SELECT property_id, household_id, groups_csv FROM ac_cardholders WHERE id = %d", $cardholder_id));
+        $result = fsbhoa_restore_cardholder( $cardholder_id );
 
-        if (!$cardholder) {
-            wp_send_json_error('Cardholder not found.');
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
         }
 
-        $property_id = $cardholder->property_id;
-
-        // 2. Check who lives at this property right now
-        $active_resident = $wpdb->get_row($wpdb->prepare(
-            "SELECT household_id FROM ac_cardholders
-             WHERE property_id = %d
-               AND cardholder_status IN ('active', 'inactive')
-               AND household_id IS NOT NULL
-             LIMIT 1",
-            $property_id
-        ));
-
-        $new_household_id = $cardholder->household_id; // Default to keeping their old household (reclaim cars!)
-
-        if ($active_resident && !empty($active_resident->household_id)) {
-            // Scenario A: Someone lives here. Join their household
-            $new_household_id = $active_resident->household_id;
-        } else {
-            // Scenario B: House is empty. Create a household if they lacked one
-            if (empty($new_household_id)) {
-                $household_name = 'Restored Household';
-                $wpdb->insert('ac_households', ['household_name' => $household_name]);
-                $new_household_id = $wpdb->insert_id;
-            }
-        }
-
-        // Determine if they should be 'active' or 'inactive' based on credentials
-        $has_credential = $wpdb->get_var($wpdb->prepare("SELECT id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1", $cardholder_id));
-        $new_status = $has_credential ? 'active' : 'inactive';
-
-        // 3. Update the cardholder record (restore status, assign household, clear groups_csv)
-        $result = $wpdb->update(
-            'ac_cardholders',
-            array(
-                'cardholder_status' => $new_status,
-                'household_id'      => $new_household_id,
-                'groups_csv'        => null // Clear the backup once restored
-            ),
-            array('id' => $cardholder_id),
-            array('%s', '%d', null),
-            array('%d')
-        );
-
-        if ($result === false) {
-            wp_send_json_error('Database error during restore.');
-        }
-
-        // 4. Rebuild the Permission Groups from the CSV backup
-        if ( !empty($cardholder->groups_csv) ) {
-            // Clear any lingering cross-references just to be safe
-            $wpdb->delete('ac_cardholder_groups', ['cardholder_id' => $cardholder_id]);
-
-            $group_ids = explode(',', $cardholder->groups_csv);
-            foreach ( $group_ids as $group_id ) {
-                $group_id = absint( trim($group_id) );
-                if ( $group_id > 0 ) {
-                    $wpdb->insert(
-                        'ac_cardholder_groups',
-                        array(
-                            'cardholder_id' => $cardholder_id,
-                            'group_id'      => $group_id
-                        ),
-                        array('%d', '%d')
-                    );
-                }
-            }
-        }
-
-        // 5. Reactivate credentials (hardware sync requirement)
-        $wpdb->update('ac_credentials', ['status' => 'active'], ['cardholder_id' => $cardholder_id], ['%s'], ['%d']);
-
-        // 6. Log the change for the hardware sync
-        $creds = $wpdb->get_col($wpdb->prepare("SELECT credential_value FROM ac_credentials WHERE cardholder_id = %d AND status = 'active'", $cardholder_id));
-        $credential_list = empty($creds) ? '' : implode(',', $creds);
-        $log_data = json_encode(['credentials' => $credential_list, 'action' => 'household_restore_active']);
-        fsbhoa_log_pending_change('cardholder', $cardholder_id, $log_data);
-
-        wp_send_json_success('Restored successfully.');
+        wp_send_json_success( 'Restored successfully.' );
     }
-
 
     // This is not really a delete, just archive.
     public function handle_delete_cardholder_action() {
@@ -281,6 +250,43 @@ class Fsbhoa_Cardholder_Actions {
         exit;
     }
 
+    public function ajax_change_resident_type_callback() {
+        check_ajax_referer( 'fsbhoa_property_search_nonce', 'security' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Permission denied.' );
+        }
+
+        $cardholder_id = isset( $_POST['cardholder_id'] ) ? absint( $_POST['cardholder_id'] ) : 0;
+        $new_type      = isset( $_POST['new_type'] ) ? sanitize_text_field( wp_unslash( $_POST['new_type'] ) ) : '';
+
+        require_once plugin_dir_path( dirname( __DIR__ ) ) . 'includes/fsbhoa-cardholder-functions.php';
+
+        $result = fsbhoa_change_cardholder_resident_type( $cardholder_id, $new_type );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( $result->get_error_message() );
+        }
+    
+        // Render updated vehicles buffer
+        $view_file = FSBHOA_AC_PLUGIN_DIR . 'includes/cardholder/views/view-cardholder-vehicles-section.php';
+        if ( file_exists( $view_file ) ) {
+            require_once $view_file;
+        }
+    
+        ob_start();
+        fsbhoa_render_vehicles_section( [
+            'id'           => $cardholder_id,
+            'household_id' => $result['household_id'],
+        ] );
+        $vehicles_html = ob_get_clean();
+    
+        wp_send_json_success( [
+            'household_id'  => $result['household_id'],
+            'vehicles_html' => $vehicles_html,
+            'message'       => 'Resident type and household updated successfully.',
+        ] );
+    }
 
     public function ajax_save_cardholder_callback() {
         check_ajax_referer('fsbhoa_property_search_nonce', 'security');
@@ -387,6 +393,8 @@ class Fsbhoa_Cardholder_Actions {
 
         // 3. Separate Cardholder Data from Vehicle Data
         $data_to_save = array_merge($existing_data, $profile_results['data'], $address_results['data'], $photo_results['data'], $credential_results['data']);
+        $data_to_save['cardholder_type'] = 'resident';
+
         $vehicles_to_save = $vehicle_results['data']['vehicle_rows'] ?? [];
 
         // Process Household constraints
@@ -621,6 +629,7 @@ class Fsbhoa_Cardholder_Actions {
                 OR p.street_name LIKE %s
                 OR cred.credential_value LIKE %s)
                AND c.cardholder_status NOT IN ('archived', 'purged')
+               AND cardholder_type = 'resident'
              GROUP BY c.id
              LIMIT 10",
             $wildcard_term,
@@ -755,6 +764,76 @@ class Fsbhoa_Cardholder_Actions {
         }
 
         wp_send_json_success('Cardholders merged successfully.');
+    }
+
+    // This will capture the database content for the current household and put
+    // it into the pastebuffer so you can pass this info to AI for debugging.
+    public function ajax_copy_household_debug_callback() {
+        check_ajax_referer( 'fsbhoa_property_search_nonce', 'security' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Permission denied.' );
+        }
+
+        $property_id  = isset( $_POST['property_id'] ) ? absint( $_POST['property_id'] ) : 0;
+        $household_id = isset( $_POST['household_id'] ) ? absint( $_POST['household_id'] ) : 0;
+
+        if ( ! $property_id ) {
+            wp_send_json_error( 'Missing property ID.' );
+        }
+
+        global $wpdb;
+
+        // If a specific household was targeted by the button, filter by it; otherwise show all property occupants
+        if ( $household_id > 0 ) {
+            $where_clause = $wpdb->prepare( "c.household_id = %d", $household_id );
+        } else {
+            $where_clause = $wpdb->prepare( "c.property_id = %d", $property_id );
+        }
+
+        $rows = $wpdb->get_results(
+            "SELECT
+                c.id AS cardholder_id,
+                CONCAT(c.first_name, ' ', c.last_name) AS name,
+                c.resident_type,
+                c.household_id,
+                h.household_name,
+                COUNT(DISTINCT v.vehicle_id) AS vehicle_count,
+                GROUP_CONCAT(DISTINCT cred.credential_value ORDER BY cred.credential_value SEPARATOR ', ') AS credentials
+            FROM ac_cardholders c
+            LEFT JOIN ac_households h ON c.household_id = h.household_id
+            LEFT JOIN ac_vehicles v ON v.household_id = c.household_id
+            LEFT JOIN ac_credentials cred ON cred.cardholder_id = c.id
+            WHERE {$where_clause}
+              AND c.cardholder_status != 'purged'
+            GROUP BY c.id, c.first_name, c.last_name, c.resident_type, c.household_id, h.household_name
+            ORDER BY c.resident_type, c.id",
+            ARRAY_A
+        );
+
+        if ( empty( $rows ) ) {
+            wp_send_json_success( "No occupants found for Household ID {$household_id}." );
+        }
+
+        $hh_label = $rows[0]['household_name'] ?? 'Household';
+        $output  = "Property ID: {$property_id} | Household ID: {$household_id} ({$hh_label})\n";
+        $output .= "ID\tName\tType\tHH_ID\tHousehold Name\tVehicles\tCredentials\n";
+        $output .= str_repeat( "-", 80 ) . "\n";
+
+        foreach ( $rows as $r ) {
+            $output .= sprintf(
+                "%d\t%s\t%s\t%s\t%s\t%d\t%s\n",
+                $r['cardholder_id'],
+                $r['name'],
+                $r['resident_type'],
+                $r['household_id'] ?? 'NULL',
+                $r['household_name'] ?? 'NULL',
+                $r['vehicle_count'],
+                $r['credentials'] ?? 'NULL'
+            );
+        }
+
+        wp_send_json_success( $output );
     }
 }
 
