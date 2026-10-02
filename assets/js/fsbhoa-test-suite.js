@@ -119,5 +119,71 @@ jQuery(document).ready(function($) {
         resultsDiv.append(`<div style="color:${color}; margin-bottom:5px;">${message}</div>`);
         resultsDiv.scrollTop(resultsDiv[0].scrollHeight);
     }
+
+
+
+    // Handler for Controller Hardware Audit
+    jQuery(document).ready(function($) {
+        $xdocument = $(document);
+        $xdocument.on('click', '#run-hardware-audit-btn', function() {
+            const $btn = $(this);
+            const resultsDiv = $('#test-results');
+    
+            $btn.prop('disabled', true).text('Auditing Controllers...');
+            resultsDiv.html('<div style="color:#333; margin-bottom:5px;"><i>Starting Hardware Audit across all controllers...</i></div>');
+
+            $.post(fsbhoa_test_vars.ajax_url, {
+                action: 'fsbhoa_run_hardware_audit',
+                nonce: fsbhoa_test_vars.nonce
+            })
+            .done(function(response) {
+                if (!response.success) {
+                    resultsDiv.append('<div style="color:red; margin-bottom:5px;">Audit Failed: ' + response.data + '</div>');
+                    return;
+                }
+    
+                resultsDiv.empty();
+                resultsDiv.append('<div style="color:#333; font-weight:bold; margin-bottom:10px;">=== UHPPOTE CONTROLLER AUDIT REPORT ===</div>');
+
+                response.data.forEach(function(report) {
+                    logResult('[' + report.status + '] ' + report.name + ' (' + report.device_id + ') - ' + report.doors_configured + ' Door(s)');
+                    logResult('  Cards DB: ' + report.total_db + ' | Cards HW: ' + report.total_hw);
+    
+                    if (report.missing_from_hw > 0 || report.unexpected_on_hw > 0) {
+                        logResult('  Missing from Board: ' + report.missing_from_hw + ' | Unexpected on Board: ' + report.unexpected_on_hw);
+                    }
+    
+                    logResult('  Unassigned (No access): ' + report.unassigned_count + ' cards');
+    
+                    // Report malformed profile values (0, 1, blanks)
+                    if (report.bad_syntax_count > 0) {
+                    logResult('  [!] Cards with invalid profile syntax (0/1/blank instead of Y/N): ' + report.bad_syntax_count);
+                    }
+    
+                    // Report referenced profiles missing from hardware
+                    if (report.missing_profiles.length > 0) {
+                        logResult('  [!] Referenced profiles missing on board: ' + report.missing_profiles.join(', '));
+                        logResult('  [!] Affected cards: ' + Object.keys(report.cards_with_missing_profiles).length);
+                    } else {
+                        logResult('  All referenced profiles are valid and present.');
+                    }
+    
+                    // Output live profile schedule summaries
+                    $.each(report.profiles, function(pid, schedule) {
+                        logResult('  [Profile ' + pid + ']: ' + schedule);
+                    });
+                });
+    
+                resultsDiv.append('<div style="color:green; font-weight:bold; margin-top:15px;">--- Hardware Audit Complete ---</div>');
+                resultsDiv.scrollTop(resultsDiv[0].scrollHeight);
+            })
+            .fail(function(xhr) {
+                resultsDiv.append('<div style="color:red; margin-bottom:5px;">AJAX error while executing hardware audit: ' + xhr.responseText + '</div>');
+            })
+            .always(function() {
+                $btn.prop('disabled', false).text('Run Controller Audit (All Boards)');
+            });
+        });
+    });
 });
 

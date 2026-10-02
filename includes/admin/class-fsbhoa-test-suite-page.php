@@ -79,6 +79,10 @@ class Fsbhoa_Test_Suite_Page {
             <p>
                 <button id="run-test-suite" class="button button-primary">Run Full Test Suite</button>
             </p>
+            <?php
+            // Hook for hardware plugins (like UHPPOTE) to add diagnostic tools
+            do_action( 'fsbhoa_admin_diagnostics_tools' );
+            ?>
             <hr>
             <h2>Test Results:</h2>
             <div id="test-results" style="font-family: monospace; background: #f1f1f1; padding: 15px; border-radius: 4px; max-height: 500px; overflow-y: auto;">
