@@ -12,7 +12,7 @@ echo "--- Starting Core Service Deployment ---"
 # 1. MONITOR SERVICE
 echo "[1/2] Building Monitor..."
 cd monitor_service
-go build -o fsbhoa_monitor main.go config.go hub.go ws_client.go notify_handle.go
+go build -o fsbhoa_monitor main.go config.go hub.go ws_client.go notify_handler.go
 sudo systemctl stop fsbhoa_monitor
 sudo cp fsbhoa_monitor "$INSTALL_BIN/"
 sudo chmod +x "$INSTALL_BIN/fsbhoa_monitor"
