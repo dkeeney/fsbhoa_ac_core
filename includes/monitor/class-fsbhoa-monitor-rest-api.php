@@ -26,6 +26,19 @@ class Fsbhoa_Monitor_REST_API {
                 ),
             ),
         ) );
+
+        // Fetch HTML summary card for a given cardholder ID
+        register_rest_route( $this->namespace, '/monitor/cardholder-summary', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_cardholder_summary_callback' ),
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'cardholder_id' => array(
+                    'required'          => true,
+                    'validate_callback' => array( $this, 'is_numeric_callback' ),
+                ),
+            ),
+        ) );
         
         // This route is called by the frontend JavaScript to get all gate data for the map
         register_rest_route( $this->namespace, '/monitor/gates', array(
@@ -230,6 +243,7 @@ class Fsbhoa_Monitor_REST_API {
             'logId'          => (int)$log_id,
             'eventType'      => $event['access_granted'] ? 'accessGranted' : 'accessDenied',
             'cardholderName' => $cardholder_name,
+            'cardholderId'   => !empty($event['cardholder_id']) ? (int)$event['cardholder_id'] : null,
             'photoURL'       => !empty($event['photo']) ? 'data:image/jpeg;base64,' . base64_encode($event['photo']) : '',
             'gateName'       => $event['gate_name'] ?: ($event['controller_identifier'] === 'kiosk' ? get_option('fsbhoa_kiosk_name', 'Kiosk') : 'Unknown Gate'),
             'timestamp'      => date('g:i:s A', strtotime($event['event_timestamp'])),
@@ -268,6 +282,7 @@ class Fsbhoa_Monitor_REST_API {
                 'logId'          => (int)$event['log_id'],
                 'eventType'      => $event['access_granted'] ? 'accessGranted' : 'accessDenied',
                 'cardholderName' => $cardholder_name,
+                'cardholderId'   => !empty($event['cardholder_id']) ? (int)$event['cardholder_id'] : null,
                 'photoURL'       => !empty($event['photo']) ? 'data:image/jpeg;base64,' . base64_encode($event['photo']) : '',
                 'gateName'       => $event['gate_name'] ?: ($event['controller_identifier'] === 'kiosk' ? get_option('fsbhoa_kiosk_name', 'Kiosk') : 'Unknown Gate'),
                 'timestamp'      => date('g:i:s A', strtotime($event['event_timestamp'])),
@@ -292,7 +307,10 @@ class Fsbhoa_Monitor_REST_API {
         $property_table = 'ac_property';
 
         // It uses the database's internal clock, to get records in the last 24 hrs.
-        $query = "SELECT l.log_id, l.event_timestamp, l.access_granted, l.event_description, cred.credential_value AS rfid_id, l.controller_identifier, ch.first_name, ch.last_name, ch.photo, d.friendly_name AS gate_name, d.door_record_id, p.street_address
+        $query = "SELECT l.log_id, l.event_timestamp, l.access_granted, 
+            l.event_description, cred.credential_value AS rfid_id, 
+            l.controller_identifier, ch.id AS cardholder_id, ch.first_name, ch.last_name, 
+            ch.photo, d.friendly_name AS gate_name, d.door_record_id, p.street_address
             FROM {$log_table} AS l
             LEFT JOIN {$cardholders_table} AS ch ON l.cardholder_id = ch.id
             LEFT JOIN ac_credentials AS cred ON ch.id = cred.cardholder_id AND cred.credential_type = 'MIFARE_BADGE'
@@ -377,6 +395,26 @@ class Fsbhoa_Monitor_REST_API {
         }
 
         return rest_ensure_response( array( 'schedule_name' => $schedule_name ) );
+    }
+
+    /**
+     * Callback to fetch the rendered read-only cardholder summary card.
+     */
+    public function get_cardholder_summary_callback( WP_REST_Request $request ) {
+        $cardholder_id = absint($request->get_param( 'cardholder_id' ) );
+        if ( ! $cardholder_id ) {
+            return new WP_Error( 'bad_request', 'Invalid cardholder ID.', array( 'status' => 400 ) );
+        }
+
+        $summary_view_file = FSBHOA_AC_PLUGIN_DIR . 'includes/view-cardholder-summary-card.php';
+        if ( ! file_exists( $summary_view_file ) ) {
+            return new WP_Error( 'missing_file', 'Summary card view file not found.', array( 'status' => 500 ) );
+        }
+
+        require_once $summary_view_file;
+
+        $html = fsbhoa_render_cardholder_summary_card($cardholder_id, false );
+        return new WP_REST_Response( array( 'html' => $html ), 200 );
     }
 
 } // end of class

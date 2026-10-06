@@ -127,5 +127,11 @@ function fsbhoa_render_live_monitor_view() {
                 </div>
             </div>
         </div>
+        <!-- Lightbox Modal for Cardholder Summary Card -->
+        <div id="fsbhoa-cardholder-modal" class="fsbhoa-modal-overlay" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; justify-content: center; align-items: center; padding: 20px; overflow-y: auto;" onclick="if(event.target === this) this.style.display='none';">
+            <div id="fsbhoa-cardholder-modal-content" style="max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; border-radius: 8px;" onclick="event.stopPropagation();">
+                <!-- Rendered summary card is dynamically injected here -->
+            </div>
+        </div>
     <?php
 }

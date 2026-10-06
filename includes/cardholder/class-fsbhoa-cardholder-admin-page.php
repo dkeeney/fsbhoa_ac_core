@@ -124,20 +124,20 @@ class Fsbhoa_Cardholder_Admin_Page {
                 <input type="hidden" name="_wp_http_referer" value="<?php echo esc_url( remove_query_arg( 'message' ) ); ?>" />
                 <?php wp_nonce_field( $nonce_action, '_wpnonce' ); ?>
                 <?php
+                require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-profile-section.php';
+                fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_groups,  $is_edit_mode );
+
                 require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-address-section.php';
                 fsbhoa_render_address_section( $form_data );
 
                 require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-household-section.php';
                 fsbhoa_render_household_section($form_data, $is_edit_mode);
 
-                require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-profile-section.php';
-                fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_groups,  $is_edit_mode );
-
                 require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-vehicles-section.php';
                 fsbhoa_render_vehicles_section( $form_data );
 
                 // Ask hardware plugins to draw their credential fields (RFID, PIN, etc.)
-                do_action('fsbhoa_render_credential_fields', $form_data, $is_edit_mode);
+                do_action('fsbhoa_render_credential_fields', $form_data, ($is_edit_mode?'edit':'add'));
 
                 require_once plugin_dir_path( __FILE__ ) . 'views/view-cardholder-photo-section.php';
                 fsbhoa_render_photo_section( $form_data, $is_edit_mode, !empty($errors) );

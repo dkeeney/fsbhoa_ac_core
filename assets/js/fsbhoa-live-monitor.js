@@ -205,6 +205,13 @@ document.addEventListener('DOMContentLoaded', function () {
             li.dataset.logId = eventData.logId;
         }
 
+        const hasCardholder = Boolean(eventData.cardholderId);
+        if (hasCardholder) {
+            li.dataset.cardholderId = eventData.cardholderId;
+            li.style.cursor = 'pointer';
+            li.title = 'Click to view cardholder details';
+        }
+
         if (isExpanded) {
             let descr = `Event at <span class="font-medium">${eventData.gateName}</span>`;
             if (eventData.controller_identifier === '900001') {
@@ -224,10 +231,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 photoClasses += " p-2 bg-gray-200";
             }
 
+            const nameClass = hasCardholder ? 'text-lg font-semibold text-blue-900 underline' : 'text-lg font-semibold text-gray-900';
             li.innerHTML = `
                 <img class="${photoClasses}" src="${photoSrc}" alt="${eventData.cardholderName}">
                 <div class="flex-1 event-text-content">
-                    <p class="text-lg font-semibold text-gray-900">${eventData.cardholderName}</p>
+                    <p class="${nameClass}"<${eventData.cardholderName}></p>
                     <p class="text-gray-500">${eventData.streetAddress}</p>
                     <p class="text-gray-600">${descr}</p>
                     <p class="text-yellow-700 font-bold event-amenity">${eventData.amenity ? `Amenity: ${eventData.amenity}` : ''}</p>
@@ -243,9 +251,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const isGranted = eventData.eventType === 'accessGranted';
             li.className = 'px-4 py-2 text-sm text-gray-600';
+            const nameSpan = hasCardholder
+                ? `<span class="font-medium text-blue-900 underline">${eventData.cardholderName}></span>`
+                : `<span>${eventData.cardholderName}></span>`;
+
             li.innerHTML = `
                 <time class="font-mono text-gray-500 mr-2">[${eventData.timestamp}]</time> 
-                ${eventData.cardholderName} ${collapsedAt} ${eventData.amenity ? `(${eventData.amenity})` : ''}
+                ${nameSpan} ${collapsedAt} ${eventData.amenity ? `(${eventData.amenity})` : ''}
                 (<span class="${isGranted ? 'text-green-600' : 'text-red-600'}">${eventData.eventMessage}</span>)
             `;
         }
@@ -404,6 +416,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    async function updateCurrentSchedule() {
+        if (!scheduleName || !scheduleIndicator) return;
+        try {
+            const response = await fetch(SCHEDULE_API_URL);
+            if (!response.ok) return; // Silent fail
+            const data = await response.json();
+
+            if (data && data.schedule_name) {
+                scheduleName.textContent = data.schedule_name;
+                scheduleIndicator.classList.remove('hidden'); // Reveal once data is loaded
+            }
+        } catch (e) {
+            console.warn("Could not fetch current schedule", e);
+        }
+    }
+
     /**
      * Sets up the functionality for the Show/Hide Map button.
      * Corrected to use a callback function for updating the button text.
@@ -428,6 +456,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         });
+    }
+
+    function setupEventListClickHandlers() {
+        const handleCardClick = function (e) {
+            const item = e.target.closest('li[data-cardholder-id]');
+            if (!item) return;
+
+            const cardholderId = item.dataset.cardholderId;
+            if (!cardholderId) return;
+
+            // Target URL for cardholder edit
+            const editUrl = `/cardholder/?action=edit_cardholder&cardholder_id=${encodeURIComponent(cardholderId)}`;
+            window.open(editUrl, '_blank');
+        };
+
+        const pedList = document.getElementById('event-list');
+        if (pedList) {
+            pedList.addEventListener('click', handleCardClick);
+        }
+
+        const vehList = document.getElementById('vehicle-event-list');
+        if (vehList) {
+            vehList.addEventListener('click', handleCardClick);
+        }
     }
 
     async function updateAccessStatus() {
@@ -486,29 +538,59 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    async function updateCurrentSchedule() {
-        if (!scheduleName || !scheduleIndicator) return;
-        try {
-            const response = await fetch(SCHEDULE_API_URL);
-            if (!response.ok) return; // Silent fail
-            const data = await response.json();
+    window.showCardholderSummaryModal =async function showCardholderSummaryModal(cardholderId) {
+        const modal = document.getElementById('fsbhoa-cardholder-modal');
+        const modalContent = document.getElementById('fsbhoa-cardholder-modal-content');
+        if (!modal || !modalContent) return;
 
-            if (data && data.schedule_name) {
-                scheduleName.textContent = data.schedule_name;
-                scheduleIndicator.classList.remove('hidden'); // Reveal once data is loaded
+        modalContent.innerHTML = '<div style="background:#fff; padding:24px; border-radius:8px; text-align:center;"><p>Loading cardholder details...</p></div>';
+        modal.style.display = 'flex';
+
+        try {
+            const endpoint = `/wp-json/fsbhoa/v1/monitor/cardholder-summary?cardholder_id=${encodeURIComponent(cardholderId)}`;
+            const response = await fetch(endpoint);
+            if (!response.ok) {
+                throw new Error(`Failed to load cardholder (${response.statusText})`);
             }
-        } catch (e) {
-            console.warn("Could not fetch current schedule", e);
+            const data = await response.json();
+            if (data && data.html) {
+                modalContent.innerHTML = data.html;
+            } else {
+                modalContent.innerHTML = '<div style="background:#fff; padding:24px; border-radius:8px; text-align:center;"><p style="color:red;">Error loading cardholder card.</p></div>';
+            }
+        } catch (err) {
+            console.error('Error fetching cardholder summary:', err);
+            modalContent.innerHTML = `<div style="background:#fff; padding:24px; border-radius:8px; text-align:center;"><p style="color:red;">${err.message}</p></div>`;
         }
     }
 
-    // Initialize the toggle button functionality
-    setupMapViewToggle();
+    function setupEventListClickHandlers() {
+        const handleLogClick = function(e) {
+            const item = e.target.closest('li[data-cardholder-id]');
+            if (!item) return;
 
-    // Add the main event listener to the map container
-    if (mapContainer) {
-        mapContainer.addEventListener('click', handleGateClick);
+            const cardholderId = item.dataset.cardholderId;
+            if (!cardholderId || cardholderId === '0' || cardholderId === 'null') {
+                return;
+            }
+
+            e.preventDefault();
+            showCardholderSummaryModal(cardholderId);
+        };
+
+        const pedList = document.getElementById('event-list');
+        if (pedList) {
+            pedList.addEventListener('click', handleLogClick);
+        }
+
+        const vehList = document.getElementById('vehicle-event-list');
+        if (vehList) {
+            vehList.addEventListener('click', handleLogClick);
+        }
     }
+
+
+
 
     // Run all initialization tasks, then connect the WebSocket.
     Promise.all([
@@ -516,6 +598,7 @@ document.addEventListener('DOMContentLoaded', function () {
         updateAccessStatus(),
         updateCurrentSchedule()
     ]).then(() => {
+        setupEventListClickHandlers();
         connect();
         setInterval(updateAccessStatus, 60000); // Poll every 60 seconds
         setInterval(updateCurrentSchedule, 60000);

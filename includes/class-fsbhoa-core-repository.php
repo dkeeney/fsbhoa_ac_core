@@ -44,8 +44,10 @@ class Fsbhoa_Core_Repository {
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_households` (
             `household_id` int NOT NULL AUTO_INCREMENT,
             `household_name` varchar(100) NOT NULL,
+            `primary_cardholder_id` int DEFAULT NULL,
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`household_id`)
+            PRIMARY KEY (`household_id`),
+            KEY `idx_primary_cardholder_id` (`primary_cardholder_id`)
         ) ENGINE=InnoDB {$charset_collate};");
 
         $wpdb->query("CREATE TABLE IF NOT EXISTS `ac_cardholders` (
@@ -358,6 +360,7 @@ class Fsbhoa_Core_Repository {
             `event_timestamp` datetime(3) NOT NULL,
             `gate_identifier` varchar(50) NOT NULL,
             `auth_id` varchar(50) DEFAULT NULL COMMENT 'Credential value or PIN presented at gate',
+            `auth_type` varchar(32) DEFAULT NULL COMMENT 'Credential type for auth_id',
             `lpr_plate_string` varchar(20) DEFAULT NULL,
             `lpr_confidence` tinyint UNSIGNED DEFAULT NULL COMMENT 'Speco OCR confidence score 0-100',
             `is_circumvention` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 if loop traversed without auth',
@@ -370,6 +373,7 @@ class Fsbhoa_Core_Repository {
             KEY `idx_lpr_plate` (`lpr_plate_string`),
             KEY `idx_auth_id` (`auth_id`),
             KEY `idx_circumvention` (`is_circumvention`, `event_timestamp`)
+            KEY `idx_auth_lookup` (`auth_type`, `auth_id`)
         ) ENGINE=InnoDB {$charset_collate};");
 
 

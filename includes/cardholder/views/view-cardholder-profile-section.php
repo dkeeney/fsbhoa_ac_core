@@ -41,12 +41,6 @@ function fsbhoa_render_profile_section( $form_data, $all_groups, $cardholder_gro
             <label for="email">Email</label>
             <input type="text" name="email" id="email" value="<?php echo esc_attr($form_data['email']); ?>" pattern=".+@.+\..+" title="Please enter a valid email address (e.g., name@domain.com)" style="width: 275px; font-size: 15px; font-weight: 500; color: #2c3338;">
         </div>
-        <div class="form-field fsbhoa-checkbox-field">
-            <label>
-                <input type="checkbox" name="email_used" value="1" <?php checked($form_data['email_used'] ?? 0, 1); ?>>
-                used
-            </label>
-        </div>
         <div class="form-field">
             <label for="phone">Phone Number</label>
             <input type="tel" name="phone" id="phone" value="<?php echo esc_attr($form_data['phone']); ?>" pattern="[0-9\s\(\)\-\.+]{10,}"  title="Please enter a valid 10-digit phone number."  style="width: 120px; font-size: 15px; font-weight: 500; color: #2c3338;">
@@ -106,7 +100,6 @@ function fsbhoa_validate_profile_data( $post_data ) {
     $sanitized_data['title'] = isset($post_data['title']) ? sanitize_text_field(wp_unslash($post_data['title'])) : '';
     $raw_email = isset($post_data['email']) ? trim(wp_unslash($post_data['email'])) : '';
     $sanitized_data['email']         = isset($post_data['email']) ? sanitize_email(wp_unslash($post_data['email'])) : '';
-    $sanitized_data['email_used']    = isset($post_data['email_used']) ? 1 : 0;
     $sanitized_data['phone_type']    = isset($post_data['phone_type']) ? sanitize_text_field(wp_unslash($post_data['phone_type'])) : '';
     $sanitized_data['notes']         = isset($post_data['notes']) ? sanitize_textarea_field(wp_unslash($post_data['notes'])) : '';
 

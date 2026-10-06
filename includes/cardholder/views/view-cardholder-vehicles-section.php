@@ -27,11 +27,11 @@ function fsbhoa_render_vehicles_section( $form_data ) {
 		<table class="widefat striped" style="border: 1px solid #c3c4c7; width: 100%; margin: 0;" id="fsbhoa-vehicles-table">
 			<thead>
 				<tr>
-					<th style="padding: 6px; width: 18%;">Type</th>
+					<th style="padding: 6px; width: 12%;">Type</th>
 					<th style="padding: 6px; width: 22%;">Make / Model</th>
-					<th style="padding: 6px; width: 10%;">Year</th>
-					<th style="padding: 6px; width: 22%;">Plate / State</th>
-					<?php do_action( 'fsbhoa_vehicle_table_header' ); ?>
+					<th style="padding: 6px; width: 5%;">Year</th>
+					<th style="padding: 6px; width: 15%;">Plate / State</th>
+					<?php do_action( 'fsbhoa_vehicle_table_head' ); ?>
 					<th style="padding: 6px; width: 8%; text-align: center;">Action</th>
 				</tr>
 			</thead>

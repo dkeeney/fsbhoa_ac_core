@@ -20,6 +20,10 @@ class Fsbhoa_Shortcodes {
         add_shortcode( 'fsbhoa_vendor_management', array( $this, 'render_vendor_management_shortcode' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_shortcode_assets' ) );
         add_action( 'wp_body_open', array( $this, 'display_sync_banner' ) );
+        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_shortcode_assets' ) );
+        add_action( 'wp_body_open', array( $this, 'display_sync_banner' ) );
+        add_action( 'wp_footer', array( $this, 'render_summary_modal_container' ) );
+        add_action( 'wp_ajax_fsbhoa_get_cardholder_summary', [ $this, 'ajax_get_cardholder_summary' ] );
     }
 
 
@@ -37,6 +41,30 @@ class Fsbhoa_Shortcodes {
         wp_enqueue_script('jquery');
         wp_enqueue_style('dashicons');
         wp_enqueue_style('fsbhoa-shared-styles', FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-shared-styles.css', array(), FSBHOA_AC_PLUGIN_VERSION);
+
+
+        // ASSETS FOR: Global Cardholder Summary Card Assets (Available across all fsbhoa shortcodes)
+        wp_enqueue_style(
+            'fsbhoa-cardholder-summary-css',
+            FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-cardholder-summary.css',
+            [ 'fsbhoa-shared-styles' ],
+            FSBHOA_AC_PLUGIN_VERSION
+        );
+
+        $summary_handle = 'fsbhoa-cardholder-summary-js';
+        wp_enqueue_script(
+            $summary_handle,
+            FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-cardholder-summary.js',
+            [ 'jquery' ],
+            FSBHOA_AC_PLUGIN_VERSION,
+            true
+        );
+
+        wp_localize_script( $summary_handle, 'fsbhoa_summary_vars', [
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce'    => wp_create_nonce( 'fsbhoa_summary_card_nonce' ),
+        ] );
+
 
         // ASSETS FOR: sync banner.  They are used by every shortcode
         wp_enqueue_script('fsbhoa-sync-script', FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-sync-admin.js', ['jquery'], FSBHOA_AC_PLUGIN_VERSION, true);
@@ -522,4 +550,65 @@ class Fsbhoa_Shortcodes {
         </div>
         <?php
     }
+
+    /**
+     * Outputs the global Cardholder Summary Modal HTML container in the footer.
+     * Accessible on any page rendering an [fsbhoa_] shortcode.
+     */
+    public function render_summary_modal_container() {
+        global $post;
+
+        // Only output on pages containing FSBHOA shortcodes
+        if ( ! is_a( $post, 'WP_Post' ) || strpos( $post->post_content, '[fsbhoa_' ) === false ) {
+            return;
+        }
+
+        // Only allow logged-in users who can view access control
+        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        ?>
+        <div id="fsbhoa-summary-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999999; align-items: center; justify-content: center;">
+            <div id="fsbhoa-summary-modal-container" style="background: #fff; width: 850px; max-width: 95vw; max-height: 90vh; border-radius: 6px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 8px; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-size: 18px; color: #1d2327;">
+                        <?php esc_html_e( 'Cardholder Summary Card', 'fsbhoa-ac' ); ?>
+                    </h3>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button type="button" class="button button-secondary" id="fsbhoa-summary-print-btn">
+                            <span class="dashicons dashicons-printer" style="margin-top: 3px;"></span> <?php esc_html_e( 'Print', 'fsbhoa-ac' ); ?>
+                        </button>
+                        <button type="button" class="button button-link" id="fsbhoa-summary-close-btn" style="font-size: 24px; line-height: 1; text-decoration: none; color: #666; cursor: pointer;">×</button>
+                    </div>
+                </div>
+                <div id="fsbhoa-summary-modal-body">
+                    <p style="text-align: center; color: #666; padding: 30px 0;"><?php esc_html_e( 'Loading cardholder data...', 'fsbhoa-ac' ); ?></p>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * AJAX handler to render the cardholder summary card.
+     */
+    public function ajax_get_cardholder_summary() {
+        check_ajax_referer( 'fsbhoa_summary_card_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => esc_html__( 'Permission denied.', 'fsbhoa-ac' ) ], 403 );
+        }
+
+        $cardholder_id = absint( $_POST['cardholder_id'] ?? 0 );
+        if ( ! $cardholder_id ) {
+            wp_send_json_error( [ 'message' => esc_html__( 'Invalid cardholder ID.', 'fsbhoa-ac' ) ], 400 );
+        }
+
+        require_once FSBHOA_AC_PLUGIN_DIR . 'includes/view-cardholder-summary-card.php';
+
+        $html = fsbhoa_render_cardholder_summary_card( $cardholder_id, false );
+
+        wp_send_json_success( [ 'html' => $html ] );
+    }
+
 }
