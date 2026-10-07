@@ -216,7 +216,7 @@ class Fsbhoa_Monitor_REST_API {
         $controllers_table = 'ac_controllers';
         $property_table = 'ac_property';
 
-        $query = $wpdb->prepare("SELECT l.event_timestamp, l.access_granted, l.event_description, cred.credential_value AS rfid_id, l.controller_identifier, ch.id as cardholder_id, ch.first_name, ch.last_name, ch.photo, d.friendly_name AS gate_name, d.door_record_id, p.street_address
+        $query = $wpdb->prepare("SELECT l.event_timestamp, l.access_granted, l.event_description, cred.credential_value AS rfid_id, l.controller_identifier, ch.id as cardholder_id, ch.first_name, ch.last_name, ch.photo, d.friendly_name AS gate_name, c.friendly_name AS controller_name, d.door_record_id, p.street_address
              FROM {$log_table} AS l
              LEFT JOIN {$cardholders_table} AS ch ON l.cardholder_id = ch.id
              LEFT JOIN {$controllers_table} AS c ON l.controller_identifier = c.uhppoted_device_id
@@ -245,7 +245,7 @@ class Fsbhoa_Monitor_REST_API {
             'cardholderName' => $cardholder_name,
             'cardholderId'   => !empty($event['cardholder_id']) ? (int)$event['cardholder_id'] : null,
             'photoURL'       => !empty($event['photo']) ? 'data:image/jpeg;base64,' . base64_encode($event['photo']) : '',
-            'gateName'       => $event['gate_name'] ?: ($event['controller_identifier'] === 'kiosk' ? get_option('fsbhoa_kiosk_name', 'Kiosk') : 'Unknown Gate'),
+            'gateName'       => $event['gate_name'] ?: ($event['controller_name'] ?: 'Unknown Gate'),
             'timestamp'      => date('g:i:s A', strtotime($event['event_timestamp'])),
             'eventMessage'   => $event['event_description'],
             'controller_identifier' => $event['controller_identifier'],
@@ -284,7 +284,7 @@ class Fsbhoa_Monitor_REST_API {
                 'cardholderName' => $cardholder_name,
                 'cardholderId'   => !empty($event['cardholder_id']) ? (int)$event['cardholder_id'] : null,
                 'photoURL'       => !empty($event['photo']) ? 'data:image/jpeg;base64,' . base64_encode($event['photo']) : '',
-                'gateName'       => $event['gate_name'] ?: ($event['controller_identifier'] === 'kiosk' ? get_option('fsbhoa_kiosk_name', 'Kiosk') : 'Unknown Gate'),
+                'gateName'       => $event['gate_name'] ?: ($event['controller_name'] ?: 'Unknown Gate'),
                 'timestamp'      => date('g:i:s A', strtotime($event['event_timestamp'])),
                 'eventMessage'   => $event['event_description'],
                 'cardNumber'     => (int)ltrim($event['rfid_id'], '0'),
@@ -310,7 +310,7 @@ class Fsbhoa_Monitor_REST_API {
         $query = "SELECT l.log_id, l.event_timestamp, l.access_granted, 
             l.event_description, cred.credential_value AS rfid_id, 
             l.controller_identifier, ch.id AS cardholder_id, ch.first_name, ch.last_name, 
-            ch.photo, d.friendly_name AS gate_name, d.door_record_id, p.street_address
+            ch.photo, d.friendly_name AS gate_name, c.friendly_name AS controller_name, d.door_record_id, p.street_address
             FROM {$log_table} AS l
             LEFT JOIN {$cardholders_table} AS ch ON l.cardholder_id = ch.id
             LEFT JOIN ac_credentials AS cred ON ch.id = cred.cardholder_id AND cred.credential_type = 'MIFARE_BADGE'
