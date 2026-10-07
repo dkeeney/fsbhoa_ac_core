@@ -100,20 +100,17 @@ class Fsbhoa_Shortcodes {
             $app_script_handle = 'fsbhoa-cardholder-admin-script';
             wp_enqueue_script($app_script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-cardholder-admin.js', array('jquery', 'jquery-ui-autocomplete', 'datatables-script', 'fsbhoa-photo-croppie', 'canvg-script'), FSBHOA_AC_PLUGIN_VERSION, true);
 
-            // Get Kiosk connection details from options
-            $kiosk_port = get_option('fsbhoa_kiosk_port', 8080);
-            $kiosk_host = get_option('fsbhoa_ac_wp_host', 'access.fsbhoa.com');
-            $kiosk_protocol = get_option('fsbhoa_ac_tls_cert_path') ? 'https' : 'http';
-
             $ajax_settings = array(
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'property_search_nonce' => wp_create_nonce('fsbhoa_property_search_nonce'),
                 'cardholder_search_nonce' => wp_create_nonce('fsbhoa_cardholder_search_nonce'),
                 'export_nonce' => wp_create_nonce('fsbhoa_export_nonce'),
-                'kiosk_url' => sprintf('%s://%s:%d', $kiosk_protocol, $kiosk_host, $kiosk_port),
                 'print_report_nonce' => wp_create_nonce('fsbhoa_print_report_nonce')
             );
             wp_localize_script($app_script_handle, 'fsbhoa_ajax_settings', $ajax_settings);
+
+            // Extension plugins enqueue assets for their cardholder list additions here.
+            do_action( 'fsbhoa_enqueue_cardholder_assets' );
 
             wp_enqueue_style('fsbhoa-property-styles', FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-property-styles.css', array('fsbhoa-shared-styles'), FSBHOA_AC_PLUGIN_VERSION);
             wp_enqueue_script('fsbhoa-property-admin', FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-property-admin.js', array('jquery', 'datatables-script'), FSBHOA_AC_PLUGIN_VERSION, true);

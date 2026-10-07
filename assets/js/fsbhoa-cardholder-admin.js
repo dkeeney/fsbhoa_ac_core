@@ -351,18 +351,6 @@ jQuery(function($) {
                 }
             });
 
-            this.vars.cardholderTable.on('click', '.fsbhoa-kiosk-signin-link', function(e) {
-                e.preventDefault();
-                const cardholderId = $(this).data('id');
-
-                if (cardholderId > 0 && typeof fsbhoa_ajax_settings !== 'undefined' && fsbhoa_ajax_settings.kiosk_url) {
-                    const kioskUrl = `${fsbhoa_ajax_settings.kiosk_url}/?cardholder_id=${cardholderId}&door_number=255`;
-                    window.open(kioskUrl, '_blank');
-                } else {
-                    alert('Error: Kiosk URL not configured or cardholder ID is missing.');
-                }
-            });
-
 
         },
 

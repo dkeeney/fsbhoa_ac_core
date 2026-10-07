@@ -111,7 +111,6 @@ function fsbhoa_render_cardholder_list_view() {
                                 $row_classes = 'fsbhoa-manual-record';
                             }
                             global $wpdb;
-                            $active_cred_count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM ac_credentials WHERE cardholder_id = %d AND status = 'active'", $cardholder['id']));
                             $all_creds = $wpdb->get_col($wpdb->prepare("SELECT credential_value FROM ac_credentials WHERE cardholder_id = %d", $cardholder['id']));
                         ?>
                         <tr class="<?php echo esc_attr($row_classes); ?>" data-cardholder-id="<?php echo esc_attr($cardholder['id']); ?>">
@@ -126,19 +125,6 @@ function fsbhoa_render_cardholder_list_view() {
                                 $delete_url = add_query_arg(array('action'=> 'fsbhoa_delete_cardholder', 'cardholder_id' => absint($cardholder['id']), '_wpnonce'=> $delete_nonce), admin_url('admin-post.php'));
                                 $print_page_url = get_permalink(get_page_by_path('print-photo-id'));
                                 $print_url = add_query_arg(array('action' => 'print_card', 'cardholder_id' => absint($cardholder['id'])), $print_page_url);
-                                if ( $active_cred_count > 0 && $cardholder['cardholder_status'] === 'active' ) {
-                                    $kiosk_link = sprintf(
-                                        '<a href="#" class="fsbhoa-action-icon fsbhoa-kiosk-signin-link" data-id="%d" title="%s"><span class="dashicons dashicons-external"></span></a>',
-                                        absint($cardholder['id']),
-                                        esc_attr__('Sign-in at Kiosk', 'fsbhoa-ac')
-                                    );
-                                } else {
-                                    $kiosk_disabled_reason = ($active_cred_count == 0) ? __('No active keys', 'fsbhoa-ac') : __('Account not active', 'fsbhoa-ac');
-                                    $kiosk_link = sprintf(
-                                        '<span class="dashicons dashicons-external fsbhoa-action-disabled" title="%s"></span>',
-                                        esc_attr__('Kiosk Sign-in', 'fsbhoa-ac') . ' (' . esc_html($kiosk_disabled_reason) . ')'
-                                    );
-                                }
                                 ?>
                                 <a href="<?php echo esc_url($edit_url); ?>" class="fsbhoa-action-icon" title="<?php esc_attr_e('Edit Cardholder', 'fsbhoa-ac'); ?>">
                                     <span class="dashicons dashicons-edit"></span>
@@ -146,7 +132,10 @@ function fsbhoa_render_cardholder_list_view() {
                                 <a href="<?php echo esc_url($print_url); ?>" class="fsbhoa-action-icon" title="<?php esc_attr_e('Print ID Card', 'fsbhoa-ac'); ?>">
                                    <span class="dashicons dashicons-printer"></span>
                                 </a>
-                                <?php echo $kiosk_link;?>
+                                <?php
+                                // Extension plugins add row action icons here.
+                                do_action( 'fsbhoa_cardholder_list_action_icons', $cardholder );
+                                ?>
                                 <a href="<?php echo esc_url($delete_url); ?>" class="fsbhoa-action-icon" title="<?php esc_attr_e('Archive Cardholder', 'fsbhoa-ac'); ?>" onclick="return confirm('Are you sure you want to archive this cardholder?');">
                                     <span class="dashicons dashicons-archive"></span>
                                 </a>
