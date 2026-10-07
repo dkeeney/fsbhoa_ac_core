@@ -20,14 +20,22 @@ class Fsbhoa_Access_Service {
         // 3. Amenity Processing (Assigns amenity_name, updates guest_count, clears preceding logs)
         $log_data = self::process_amenity_logic($log_data);
 
-        // 4. Database Write
+        // 4. For a denied card, add everything known about it to the reason,
+        //    so staff can see why it was rejected (archived, disabled, expired, ...).
+        if ( isset( $log_data['access_granted'] ) && (int) $log_data['access_granted'] === 0 && ! empty( $log_data['rfid_id'] ) ) {
+            $reason = trim( (string) ( $log_data['event_description'] ?? '' ) );
+            $diagnosis = self::describe_credential( $log_data['rfid_id'] );
+            $log_data['event_description'] = mb_substr( $reason === '' ? $diagnosis : $reason . ' | ' . $diagnosis, 0, 255 );
+        }
+
+        // 5. Database Write
         $log_id = self::write_to_access_log($log_data);
         if ( !$log_id ) {
             // Database write failed (write_to_access_log returned false).
              return new WP_Error('db_error', 'Failed to insert event into access log.');
         }
 
-        // 5. Notification (Centralized logic)
+        // 6. Notification (Centralized logic)
         // If we successfully wrote the log, notify the monitor service.
         self::send_notification_to_monitor($log_id);
 
@@ -66,11 +74,83 @@ class Fsbhoa_Access_Service {
             $log_data['cardholder_id'] = absint( $cardholder->id );
             $log_data['resident_type'] = $cardholder->resident_type;
         } else {
-            // Card is not found in the system
+            // No active badge for an active cardholder. Keep the caller's reason (e.g. the
+            // controller's); describe_credential() adds the details when the event is written.
             $log_data['cardholder_id'] = 0;
             $log_data['access_granted'] = 0; // Ensure access is denied if card is unknown
-            $log_data['event_description'] = 'Card not found';
+            if ( empty( $log_data['event_description'] ) ) {
+                $log_data['event_description'] = 'Card not found';
+            }
         }
+    }
+
+    /**
+     * Describes every credential with this number, whatever its status, for a denied event.
+     * Example: "Badge 19107883: inactive; test card (#936) archived 2025-10-08"
+     * @param string $value The credential number as read (may be zero-padded).
+     * @return string One description per matching credential, or "not in the system".
+     */
+    public static function describe_credential( $value ) {
+        global $wpdb;
+
+        $value   = trim( (string) $value );
+        $trimmed = ltrim( $value, '0' );
+        if ( $trimmed === '' ) {
+            $trimmed = '0';
+        }
+
+        // Readers zero-pad numbers (00010011), but credentials may be stored without padding.
+        $creds = $wpdb->get_results( $wpdb->prepare(
+            "SELECT cred.credential_type, cred.credential_value, cred.status, cred.expiration_date,
+                    ct.description AS type_name,
+                    ch.id AS cardholder_id, ch.first_name, ch.last_name, ch.cardholder_status, ch.deleted_at,
+                    v.license_plate, v.plate_state
+             FROM ac_credentials cred
+             LEFT JOIN ac_credential_types ct ON ct.type_code = cred.credential_type
+             LEFT JOIN ac_cardholders ch ON ch.id = cred.cardholder_id
+             LEFT JOIN ac_vehicles v ON v.vehicle_id = cred.vehicle_id
+             WHERE cred.credential_value IN (%s, %s)
+             ORDER BY cred.credential_type = 'MIFARE_BADGE' DESC, cred.id DESC",
+            $value,
+            $trimmed
+        ) );
+
+        if ( $wpdb->last_error ) {
+            error_log( 'FSBHOA ACCESS: describe_credential DB error: ' . $wpdb->last_error );
+            return 'Card ' . $value . ': lookup failed';
+        }
+        if ( empty( $creds ) ) {
+            return 'Card ' . $value . ' is not in the system';
+        }
+
+        $now   = current_time( 'timestamp' );
+        $parts = [];
+        foreach ( $creds as $cred ) {
+            $type   = $cred->credential_type === 'MIFARE_BADGE' ? 'Badge' : ( $cred->type_name ?: $cred->credential_type );
+            $status = $cred->status !== '' ? $cred->status : 'no status';
+            if ( ! empty( $cred->expiration_date ) && strtotime( $cred->expiration_date ) < $now ) {
+                $status .= ', expired ' . date( 'Y-m-d', strtotime( $cred->expiration_date ) );
+            }
+            $text = $type . ' ' . $cred->credential_value . ': ' . $status;
+
+            if ( ! empty( $cred->license_plate ) ) {
+                $text .= '; vehicle ' . $cred->license_plate . ( $cred->plate_state ? ' (' . $cred->plate_state . ')' : '' );
+            }
+
+            if ( $cred->cardholder_id ) {
+                $name = trim( $cred->first_name . ' ' . $cred->last_name );
+                $text .= '; ' . ( $name !== '' ? $name : 'cardholder' ) . ' (#' . $cred->cardholder_id . ') ' . $cred->cardholder_status;
+                if ( in_array( $cred->cardholder_status, [ 'archived', 'purged' ], true ) && ! empty( $cred->deleted_at ) ) {
+                    $text .= ' ' . date( 'Y-m-d', strtotime( $cred->deleted_at ) );
+                }
+            } else {
+                $text .= '; no cardholder';
+            }
+
+            $parts[] = $text;
+        }
+
+        return implode( ' | ', $parts );
     }
     
 
