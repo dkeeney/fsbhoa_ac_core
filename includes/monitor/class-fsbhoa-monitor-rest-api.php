@@ -88,20 +88,8 @@ class Fsbhoa_Monitor_REST_API {
             'methods'             => 'POST',
             'callback'            => array( $this, 'set_door_state_callback' ),
             'permission_callback' => function ( WP_REST_Request $request ) {
-                // 1. Allow Admins
-                if ( current_user_can( 'manage_options' ) ) {
-                    return true;
-                }
-                
-                // 2. Allow Kiosk via API Key Header
-                $stored_key = get_option('fsbhoa_ac_kiosk_api_key', '');
-                $provided_key = $request->get_header('X-FSBHOA-Kiosk-Key');
-                
-                if ( !empty($stored_key) && !empty($provided_key) && hash_equals($stored_key, $provided_key) ) {
-                    return true;
-                }
-                
-                return false;
+                // Only admins (the live monitor screen) can change door state.
+                return current_user_can( 'manage_options' );
             },
         ) );
     }

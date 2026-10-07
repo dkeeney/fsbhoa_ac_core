@@ -7,13 +7,11 @@ jQuery(document).ready(function($) {
         runButton.prop('disabled', true).text('Running...');
         resultsDiv.html('<p>Starting test suite...</p>');
 
-        // Define the sequence of tests
-        runTestStep('run_hardware_test', '1. Triggering hardware event from event_service...')
-            .then(() => runTestStep('verify_hardware_test', '2. Verifying hardware event in database...'))
-            .then(() => runTestStep('run_kiosk_test', '3. Triggering kiosk sign-in via REST API...'))
-            .then(() => runTestStep('verify_kiosk_test', '4. Verifying kiosk event in database...'))
-            .then(() => runTestStep('run_import_test', '5. Triggering test CSV import...'))
-            .then(() => runTestStep('verify_import_test', '6. Verifying import completion status...'))
+        // Steps come from the server (core plus any extension plugins), in order.
+        fsbhoa_test_vars.steps.reduce(
+            (chain, step, index) => chain.then(() => runTestStep(step.id, `${index + 1}. ${step.label}`)),
+            Promise.resolve()
+        )
             .then(() => {
                 logResult('--- Test Suite Complete ---', 'success');
                 runButton.prop('disabled', false).text('Run Full Test Suite');

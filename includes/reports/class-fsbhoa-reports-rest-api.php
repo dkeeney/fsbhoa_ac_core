@@ -74,7 +74,7 @@ class Fsbhoa_Reports_REST_API {
         $columns = [ 'l.event_timestamp', 'l.event_timestamp', "CONCAT(ch.first_name, ' ', ch.last_name)", 'ch.resident_type', 'p.street_address', 'd.friendly_name', 'l.access_granted', 'l.event_description' ];
         $order_by_col = $columns[$order_col_index] ?? $columns[0];
 
-        $data_query = " SELECT l.log_id, l.controller_identifier, ch.id AS cardholder_id, ch.photo, l.rfid_id, l.event_timestamp, CONCAT(ch.first_name, ' ', ch.last_name) as cardholder, ch.resident_type, p.street_address as property, d.friendly_name as gate_name, l.access_granted, l.event_description {$base_query} {$where_sql} ORDER BY {$order_by_col} {$order_dir} LIMIT %d OFFSET %d ";
+        $data_query = " SELECT l.log_id, l.controller_identifier, ch.id AS cardholder_id, ch.photo, l.rfid_id, l.event_timestamp, CONCAT(ch.first_name, ' ', ch.last_name) as cardholder, ch.resident_type, p.street_address as property, d.friendly_name as gate_name, c.friendly_name as controller_name, l.access_granted, l.event_description {$base_query} {$where_sql} ORDER BY {$order_by_col} {$order_dir} LIMIT %d OFFSET %d ";
         $results = $wpdb->get_results( $wpdb->prepare( $data_query, $length, $start ), ARRAY_A );
         if ( $wpdb->last_error ) { return new WP_Error( 'db_error', 'Database error fetching report data.', array( 'status' => 500, 'db_error' => $wpdb->last_error ) ); }
         
@@ -94,10 +94,16 @@ class Fsbhoa_Reports_REST_API {
             } else {
                 $row['cardholder'] = '<em>Event/No Card</em>';
             }
-            if ($row['controller_identifier'] === 'kiosk') {
-                $row['gate_name'] = 'Kiosk';
+            // Door name, else the controller's name (no matching door), else the raw identifier
+            // (e.g. older kiosk rows logged as 'kiosk').
+            if ($row['gate_name']) {
+                $row['gate_name'] = esc_html($row['gate_name']);
+            } elseif ($row['controller_name']) {
+                $row['gate_name'] = esc_html($row['controller_name']);
+            } elseif ($row['controller_identifier'] !== '') {
+                $row['gate_name'] = '<em>' . esc_html($row['controller_identifier']) . '</em>';
             } else {
-                $row['gate_name'] = $row['gate_name'] ? esc_html($row['gate_name']) : '<em>Unknown Gate</em>';
+                $row['gate_name'] = '<em>Unknown Gate</em>';
             }
             $row['property'] = $row['property'] ? esc_html($row['property']) : '';
             $row['property'] = $row['property'] ? esc_html($row['property']) : '';
@@ -122,13 +128,11 @@ public function get_usage_analytics_callback( WP_REST_Request $request ) {
 
         // --- Gate Usage Query ---
         // 1. Removed "Card swipe%" filter to include "Amenity:" and "Access:" events.
-        // 2. Added CASE statement to properly label the Kiosk (which fails the join).
+        // 2. Label by door name, else controller name, else the raw identifier (same as the
+        //    Access Log report). Each kiosk station is counted under its own name.
         $gate_results = $wpdb->get_results( $wpdb->prepare(
             "SELECT 
-                CASE 
-                    WHEN l.controller_identifier = 'kiosk' OR l.controller_identifier = '900000' THEN 'Lobby Kiosk'
-                    ELSE COALESCE(d.friendly_name, 'Unknown Gate') 
-                END as friendly_name, 
+                COALESCE(d.friendly_name, c.friendly_name, NULLIF(l.controller_identifier, ''), 'Unknown Gate') as friendly_name, 
                 COUNT(l.log_id) as count
             FROM ac_access_log l
             LEFT JOIN ac_controllers c ON l.controller_identifier = c.uhppoted_device_id
@@ -137,10 +141,7 @@ public function get_usage_analytics_callback( WP_REST_Request $request ) {
               AND YEAR(l.event_timestamp) = %d 
               AND MONTH(l.event_timestamp) = %d
             GROUP BY 
-                CASE 
-                    WHEN l.controller_identifier = 'kiosk' OR l.controller_identifier = '900000' THEN 'Lobby Kiosk'
-                    ELSE COALESCE(d.friendly_name, 'Unknown Gate') 
-                END
+                COALESCE(d.friendly_name, c.friendly_name, NULLIF(l.controller_identifier, ''), 'Unknown Gate')
             ORDER BY COUNT(l.log_id) DESC",
             $year,
             $month

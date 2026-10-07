@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"sync"
-        "time"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to them.
@@ -92,8 +91,8 @@ type WSMessage struct {
             case cmd := <-h.commandC:
 		if cmd == "request_status_poll" {
 			log.Println("INFO: Processing status poll request.")
-			go h.triggerImmediatePoll()     // 1. Hardware Gates
-			go h.triggerKioskStatusReport() // 2. Kiosk Gates
+			// The event service polls hardware gates and kiosk stations.
+			go h.triggerImmediatePoll()
 		}
             }
         }
@@ -130,31 +129,4 @@ func (h *Hub) triggerImmediatePoll() {
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("ERROR: Event_service poll trigger returned non-200 status: %s", resp.Status)
 	}
-}
-
-
-// triggerKioskStatusReport tells the Kiosk Service to report connected gates.
-func (h *Hub) triggerKioskStatusReport() {
-    if h.config.KioskServiceURL == "" {
-        return
-    }
-
-    kioskURL := h.config.KioskServiceURL + "/api/internal/report-status"
-
-    // Create a client that skips verification if we are using localhost with a domain cert
-    tr := &http.Transport{
-        TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-    }
-    client := &http.Client{
-        Transport: tr,
-        Timeout:   2 * time.Second,
-    }
-
-    resp, err := client.Get(kioskURL)
-    if err != nil {
-        log.Printf("WARN: Could not trigger Kiosk status report: %v", err)
-        return
-    }
-    defer resp.Body.Close()
-    log.Println("INFO: Triggered Kiosk Status Report.")
 }

@@ -100,16 +100,6 @@ console.log('Data to send:', dataToSend);
         frame.open();
     });
 
-    // --- Kiosk Settings Saver ---
-    $('#fsbhoa-save-kiosk-settings-button').on('click', function() {
-        handleAjaxSave(
-            '#fsbhoa-save-kiosk-settings-button',
-            '#fsbhoa-kiosk-settings-page',
-            'fsbhoa_save_kiosk_settings',
-            fsbhoa_settings_vars.kiosk_nonce
-        );
-    });
-
     // --- Pool Alarm Saver ---
     $('#fsbhoa-save-pool-alarm-settings-button').on('click', function(e) {
         e.preventDefault();
@@ -119,48 +109,6 @@ console.log('Data to send:', dataToSend);
             'fsbhoa_save_pool_alarm',
             fsbhoa_settings_vars.pool_alarm_nonce
         );
-    });
-
-    // --- Media Uploader for Kiosk Page Logo ---
-    $('#fsbhoa_kiosk_logo_url-button').on('click', function(e) {
-        e.preventDefault();
-        const button = $(this);
-        const inputField = $('#fsbhoa_kiosk_logo_url');
-
-        const frame = wp.media({
-            title: 'Select or Upload Kiosk Logo',
-            button: { text: 'Use this image' },
-            library: { type: 'image' },
-            multiple: false
-        });
-
-        frame.on('select', function() {
-            const attachment = frame.state().get('selection').first().toJSON();
-            inputField.val(attachment.url);
-        });
-
-        frame.open();
-    });
-
-    // --- Media Uploader for Kiosk Splash Image ---
-    $('#fsbhoa_kiosk_splash_url-button').on('click', function(e) {
-        e.preventDefault();
-        const button = $(this);
-        const inputField = $('#fsbhoa_kiosk_splash_url');
-
-        const frame = wp.media({
-            title: 'Select or Upload Kiosk Splash Image',
-            button: { text: 'Use this image' },
-            library: { type: 'image' },
-            multiple: false
-        });
-
-        frame.on('select', function() {
-            const attachment = frame.state().get('selection').first().toJSON();
-            inputField.val(attachment.url);
-        });
-
-        frame.open();
     });
 
     // Generic handler for ANY "Generate New API Key" button

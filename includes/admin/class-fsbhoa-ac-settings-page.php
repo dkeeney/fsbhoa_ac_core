@@ -66,7 +66,6 @@ class Fsbhoa_Ac_Settings_Page {
         $event_log_path   = get_option('fsbhoa_ac_event_log_path', '');
         $debug_mode       = get_option('fsbhoa_ac_debug_mode', 'on');
         $test_stub        = get_option('fsbhoa_ac_test_stub', 'on');
-        $kiosk_port       = get_option('fsbhoa_kiosk_port', 8080);
 
         $pool_alarm_enabled     = get_option('fsbhoa_pool_alarm_enabled', '0');
         $pool_alarm_enable_url  = get_option('fsbhoa_pool_alarm_enable_url', '');
@@ -81,8 +80,6 @@ class Fsbhoa_Ac_Settings_Page {
             'tls_key_path'      => sanitize_text_field($tls_key_path),
             'event_service_url' => sprintf('%s://%s:%d', $protocol, $wp_host, absint($websocket_port)),
             'photo_event_limit' => (int) get_option('fsbhoa_ac_monitor_photo_limit', 3),
-            'kiosk_service_url' => sprintf('%s://%s:%d', $protocol, $wp_host, absint($kiosk_port)),
-            'api_key'           => get_option('fsbhoa_ac_kiosk_api_key', ''),
         ];
         $this->write_config_file($this->monitor_service_config_path, $monitor_config);
 
@@ -160,6 +157,15 @@ class Fsbhoa_Ac_Settings_Page {
             'fsbhoa_ac_api_keys_section',
             ['id' => 'fsbhoa_ac_api_key', 'desc' => 'Secret key used to authorize automated CSV imports via the REST API.']
         );
+
+        add_settings_field(
+            'fsbhoa_ac_verify_api_key_field',
+            'Access Verification API Key',
+            array($this, 'render_api_key_field'),
+            $general_page_slug,
+            'fsbhoa_ac_api_keys_section',
+            ['id' => 'fsbhoa_ac_verify_api_key', 'desc' => 'Secret key for other systems (e.g. the lighting system) to check whether a person recently entered (/access/verify-email). Paste it into that system\'s settings.']
+        );
         // Section: Amenity Tracking
         add_settings_section('fsbhoa_ac_amenity_tracking_section', 'Amenity Tracking Settings', null, $general_page_slug);
         add_settings_field(
@@ -228,6 +234,7 @@ class Fsbhoa_Ac_Settings_Page {
         register_setting($general_option_group, 'fsbhoa_ac_tls_cert_path', 'sanitize_text_field');
         register_setting($general_option_group, 'fsbhoa_ac_tls_key_path', 'sanitize_text_field');
         register_setting($general_option_group, 'fsbhoa_ac_api_key', 'sanitize_text_field');
+        register_setting($general_option_group, 'fsbhoa_ac_verify_api_key', 'sanitize_text_field');
         register_setting($general_option_group, 'fsbhoa_ac_rate_limit_minutes', 'absint');
         register_setting($general_option_group, 'fsbhoa_ac_amenity_clear_minutes', 'absint');
         register_setting($general_option_group, 'fsbhoa_ac_default_court_amenity_name', 'sanitize_text_field');

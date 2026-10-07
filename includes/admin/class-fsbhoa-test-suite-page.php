@@ -33,9 +33,15 @@ class Fsbhoa_Test_Suite_Page {
             FSBHOA_AC_PLUGIN_VERSION,
             true
         );
+        // Step ids and labels only; the callbacks run server-side.
+        $steps = array_map( function ( $step ) {
+            return [ 'id' => $step['id'], 'label' => $step['label'] ];
+        }, Fsbhoa_Test_Suite_Actions::get_steps() );
+
         wp_localize_script('fsbhoa-test-suite-js', 'fsbhoa_test_vars', [
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce'    => wp_create_nonce('fsbhoa_test_suite_nonce')
+            'nonce'    => wp_create_nonce('fsbhoa_test_suite_nonce'),
+            'steps'    => $steps,
         ]);
     }
 

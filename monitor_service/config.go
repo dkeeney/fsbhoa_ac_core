@@ -13,7 +13,6 @@ type Config struct {
     WordPressToken  string `json:"wordpress_token,omitempty"` // If you need auth
     EventServiceURL string `json:"event_service_url"`
     PhotoEventLimit int    `json:"photo_event_limit,omitempty"`
-    KioskServiceURL string `json:"kiosk_service_url"`
 }
 
 func LoadConfig(filename string) (*Config, error) {

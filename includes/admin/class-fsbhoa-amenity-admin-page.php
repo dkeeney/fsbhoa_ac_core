@@ -54,9 +54,6 @@ class Fsbhoa_Amenity_Admin_Page {
         <div class="wrap fsbhoa-frontend-wrap fsbhoa-amenity-page">
             <h1 class="wp-heading-inline">Current Amenities</h1>
             <hr class="wp-header-end">
-            <div class="notice notice-info inline">
-                <p><strong>Important:</strong> After adding, removing, or re-ordering amenities, you must <strong>restart the Kiosk service</strong> from the System Status page for the changes to appear on the kiosk screen.</p>
-            </div>
             <table id="amenities-list-table" class="wp-list-table widefat striped">
                 <thead>
                     <tr>

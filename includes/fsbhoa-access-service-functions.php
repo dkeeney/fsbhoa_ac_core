@@ -387,22 +387,19 @@ class Fsbhoa_Access_Service {
         // --- SCENARIO B: ENTRY GATE SWIPE (Sets Provisional Amenity) ---
         else if ( $door_info->door_role === 'ENTRY_GATE' ) {
         
-            // This includes West Gate and Kiosk (which supplies amenity_name directly).
+            // SCENARIO 2A: Physical Entry Gate (West Gate/Front Door) - Set Provisional
+            // (Kiosk sign-ins arrive on KIOSK-role doors; see Scenario C.)
 
-            if ( $log_data['controller_identifier'] !== 'kiosk' ) {
-                // SCENARIO 2A: Physical Entry Gate (West Gate/Front Door) - Set Provisional
-        
-                // 1. Get the amenity names associated with the entry gate (array of names)
-                $entry_amenity_names = self::get_door_amenity_names( $door_info->door_record_id ); 
-        
-                // 2. Set the provisional name to the FIRST amenity in the list (if any)
-                $provisional_name = empty($entry_amenity_names) ? 'Unknown Amenity' : $entry_amenity_names[0];
+            // 1. Get the amenity names associated with the entry gate (array of names)
+            $entry_amenity_names = self::get_door_amenity_names( $door_info->door_record_id ); 
+
+            // 2. Set the provisional name to the FIRST amenity in the list (if any)
+            $provisional_name = empty($entry_amenity_names) ? 'Unknown Amenity' : $entry_amenity_names[0];
 
 
-                $log_data['event_description'] = 'Amenity: ' . esc_html($provisional_name);
-                $log_data['amenity_name'] = $provisional_name;
-                $log_data['guest_count'] = 0;
-            }
+            $log_data['event_description'] = 'Amenity: ' . esc_html($provisional_name);
+            $log_data['amenity_name'] = $provisional_name;
+            $log_data['guest_count'] = 0;
         }
         // --- SCENARIO C: KIOSK (Definitive / Human Intent) ---
         else if ( $door_info->door_role === 'KIOSK' ) {
@@ -541,8 +538,8 @@ class Fsbhoa_Access_Service {
      * Retrieves essential door configuration (role and amenity ID) based on hardware identifiers.
      * This function uses the new door_role and amenity_id fields.
      *
-     * @param string $controller_identifier The hardware serial ID (or 'VIRTUAL_KIOSK').
-     * @param int $door_number The door number on the controller (or virtual Kiosk ID).
+     * @param string $controller_identifier The controller serial (hardware or virtual).
+     * @param int $door_number The door number on the controller.
      * @return object|null Door information object with friendly_name, door_role, and amenity_id.
      */
     private static function get_door_info( $controller_identifier, $door_number ) {

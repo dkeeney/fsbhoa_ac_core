@@ -22,13 +22,13 @@ class Fsbhoa_Verification_REST_API {
     }
 
     /**
-     * Security: Uses the shared Kiosk API key for now, or you can add a new option.
+     * Security: callers send the Access Verification API Key (General settings) in X-API-KEY.
      */
     public function api_key_permission_check( WP_REST_Request $request ) {
         $provided_key = $request->get_header('X-API-KEY');
         
-        // Re-using the Kiosk Key for simplicity, but could be 'fsbhoa_ac_system_api_key'
-        $stored_key = get_option('fsbhoa_ac_kiosk_api_key', '');
+        // Its own key, so it doesn't depend on (or break with) another plugin's key.
+        $stored_key = get_option('fsbhoa_ac_verify_api_key', '');
 
         if ( !empty($stored_key) && !empty($provided_key) && hash_equals($stored_key, $provided_key) ) {
             return true;
