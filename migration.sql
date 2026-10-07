@@ -224,4 +224,10 @@ ALTER TABLE `ac_households`
   ON DELETE SET NULL 
   ON UPDATE CASCADE;
 
+-- ==============================================================================
+-- STEP 6: Door network address (kiosk stations are identified by IP address)
+-- ==============================================================================
+ALTER TABLE `ac_doors`
+  ADD COLUMN IF NOT EXISTS `ip_address` varchar(45) DEFAULT NULL COMMENT 'Network address of the device at this door (e.g. a kiosk station browser).' AFTER `door_delay`;
+
 SET FOREIGN_KEY_CHECKS = 1;

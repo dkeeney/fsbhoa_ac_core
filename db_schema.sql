@@ -172,7 +172,8 @@ CREATE TABLE `ac_doors` (
   `amenity_role` varchar(20) DEFAULT NULL,
   `door_role` enum('INNER_GATE','ENTRY_GATE','PERIMETER','KIOSK') DEFAULT NULL,
   `amenity_id` varchar(255) DEFAULT NULL COMMENT 'Comma-separated list of amenity IDs covered by this door.',
-  `door_delay` tinyint(3) UNSIGNED NOT NULL DEFAULT 3 COMMENT 'Seconds the relay remains energized (UHPPOTE door-delay)'
+  `door_delay` tinyint(3) UNSIGNED NOT NULL DEFAULT 3 COMMENT 'Seconds the relay remains energized (UHPPOTE door-delay)',
+  `ip_address` varchar(45) DEFAULT NULL COMMENT 'Network address of the device at this door (e.g. a kiosk station browser).'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------
