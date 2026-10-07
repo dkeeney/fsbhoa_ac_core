@@ -20,7 +20,7 @@ Rules (from `fsbhoa_ac_core/fsbhoa-ac-core.php`):
 2. Extensions may depend on core.
 
 Core exposes extension points via WordPress hooks; extensions implement them. When an extension needs new behavior from core, add a `do_action`/`apply_filters` hook to core rather than having core call plugin code. Examples:
-- Lifecycle events: `fsbhoa_core_cardholder_created/updated/restored`, `fsbhoa_core_cardholders_merged`, `fsbhoa_core_cardholder_household_changed`, `fsbhoa_core_vehicle_saved/deleted`, `fsbhoa_core_group_saved`, `fsbhoa_pending_change_{type}`
+- Lifecycle events: `fsbhoa_core_cardholder_created/updated/restored`, `fsbhoa_core_cardholders_merged`, `fsbhoa_core_cardholder_household_changed`, `fsbhoa_core_vehicle_saved/deleted`, `fsbhoa_core_group_saved`, `fsbhoa_core_amenities_changed`, `fsbhoa_pending_change_{type}`
 - Hardware abstraction filters: `fsbhoa_hardware_set_door_state`, `fsbhoa_hardware_map_event_data`, `fsbhoa_hardware_group_status`, `fsbhoa_validate_credentials`
 - Vehicle UI/validation: `fsbhoa_vehicle_table_head`, `fsbhoa_vehicle_table_row_columns`, `fsbhoa_is_vehicle_row_empty`, `fsbhoa_validate_vehicle_row`
 - UI injection: `fsbhoa_render_credential_fields`, `fsbhoa_register_admin_submenus`, `fsbhoa_hardware_management_view_{view}`, `fsbhoa_render_hardware_task_lists`, `fsbhoa_cardholder_list_status_icons`, `fsbhoa_cardholder_list_action_icons`, `fsbhoa_enqueue_cardholder_assets`

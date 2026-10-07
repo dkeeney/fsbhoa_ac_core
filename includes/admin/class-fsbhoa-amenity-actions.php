@@ -18,6 +18,14 @@ class Fsbhoa_Amenity_Actions {
         add_action('wp_ajax_fsbhoa_edit_amenity', array($this, 'handle_ajax_edit_amenity'));
     }
 
+    /**
+     * Tells extension plugins that the amenity list changed (added, edited, deleted,
+     * reordered, or turned on/off), e.g. so a kiosk can refresh its buttons.
+     */
+    private function amenities_changed() {
+        do_action('fsbhoa_core_amenities_changed');
+    }
+
     public function handle_add_or_edit_amenity() {
         if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'fsbhoa_amenity_nonce') || !current_user_can('manage_options')) {
             wp_die('Security check failed.');
@@ -51,6 +59,7 @@ class Fsbhoa_Amenity_Actions {
             error_log('FSBHOA DB Error on amenity save: ' . $wpdb->last_error);
             $redirect_url = add_query_arg('message', 'error', $redirect_url);
         } else {
+            $this->amenities_changed();
             $redirect_url = add_query_arg('message', $message, $redirect_url);
         }
 
@@ -70,7 +79,9 @@ class Fsbhoa_Amenity_Actions {
         $current_status = $wpdb->get_var($wpdb->prepare("SELECT is_active FROM {$table_name} WHERE id = %d", $amenity_id));
         if (!is_null($current_status)) {
             $new_status = (intval($current_status) === 1) ? 0 : 1;
-            $wpdb->update($table_name, ['is_active' => $new_status], ['id' => $amenity_id]);
+            if ($wpdb->update($table_name, ['is_active' => $new_status], ['id' => $amenity_id]) !== false) {
+                $this->amenities_changed();
+            }
         }
 
         wp_safe_redirect(wp_get_referer());
@@ -99,6 +110,7 @@ class Fsbhoa_Amenity_Actions {
             if ($result1 === false || $result2 === false) {
                 wp_die('DB error swapping items: ' . esc_html($wpdb->last_error));
             }
+            $this->amenities_changed();
         }
 
         $redirect_url = wp_get_referer();
@@ -146,6 +158,7 @@ class Fsbhoa_Amenity_Actions {
             $error_message = 'Database Error: Could not delete the amenity.';
             $redirect_url = add_query_arg('message', 'error', $redirect_url);
         } else {
+            $this->amenities_changed();
             $redirect_url = add_query_arg('message', 'deleted', $redirect_url);
         }
 
@@ -180,6 +193,7 @@ class Fsbhoa_Amenity_Actions {
         if ($result === false) {
             wp_send_json_error(['message' => 'Database update failed: ' . $wpdb->last_error]);
         }
+        $this->amenities_changed();
 
         // Send back the clean data to update the UI
         wp_send_json_success([
