@@ -74,7 +74,7 @@ class Fsbhoa_Reports_REST_API {
         $columns = [ 'l.event_timestamp', 'l.event_timestamp', "CONCAT(ch.first_name, ' ', ch.last_name)", 'ch.resident_type', 'p.street_address', 'd.friendly_name', 'l.access_granted', 'l.event_description' ];
         $order_by_col = $columns[$order_col_index] ?? $columns[0];
 
-        $data_query = " SELECT l.log_id, l.controller_identifier, ch.id AS cardholder_id, ch.photo, l.event_timestamp, CONCAT(ch.first_name, ' ', ch.last_name) as cardholder, ch.resident_type, p.street_address as property, d.friendly_name as gate_name, l.access_granted, l.event_description {$base_query} {$where_sql} ORDER BY {$order_by_col} {$order_dir} LIMIT %d OFFSET %d ";
+        $data_query = " SELECT l.log_id, l.controller_identifier, ch.id AS cardholder_id, ch.photo, l.rfid_id, l.event_timestamp, CONCAT(ch.first_name, ' ', ch.last_name) as cardholder, ch.resident_type, p.street_address as property, d.friendly_name as gate_name, l.access_granted, l.event_description {$base_query} {$where_sql} ORDER BY {$order_by_col} {$order_dir} LIMIT %d OFFSET %d ";
         $results = $wpdb->get_results( $wpdb->prepare( $data_query, $length, $start ), ARRAY_A );
         if ( $wpdb->last_error ) { return new WP_Error( 'db_error', 'Database error fetching report data.', array( 'status' => 500, 'db_error' => $wpdb->last_error ) ); }
         
@@ -86,7 +86,14 @@ class Fsbhoa_Reports_REST_API {
             $row['access_granted'] = is_null($granted) ? '—' : ($granted ? '<span class="access-granted">Granted</span>' : '<span class="access-denied">Denied</span>');
             $resident_type = $row['resident_type'];
             if ( $resident_type === 'Resident Owner' ) { $row['resident_type'] = 'O'; } elseif ( !empty($resident_type) ) { $row['resident_type'] = strtoupper(substr($resident_type, 0, 1)); } else { $row['resident_type'] = ''; }
-            $row['cardholder'] = $row['cardholder'] ? esc_html($row['cardholder']) : '<em>Event/No Card</em>';
+            if ( $row['cardholder'] ) {
+                $row['cardholder'] = esc_html($row['cardholder']);
+            } elseif ( !empty($row['rfid_id']) && $row['rfid_id'] != 0 ) {
+                // Keep the number of an unrecognized card so it can be looked up.
+                $row['cardholder'] = '<em>Unknown Card (' . esc_html($row['rfid_id']) . ')</em>';
+            } else {
+                $row['cardholder'] = '<em>Event/No Card</em>';
+            }
             if ($row['controller_identifier'] === 'kiosk') {
                 $row['gate_name'] = 'Kiosk';
             } else {

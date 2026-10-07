@@ -216,11 +216,10 @@ class Fsbhoa_Monitor_REST_API {
         $controllers_table = 'ac_controllers';
         $property_table = 'ac_property';
 
-        $query = $wpdb->prepare("SELECT l.event_timestamp, l.access_granted, l.event_description, cred.credential_value AS rfid_id, l.controller_identifier, ch.id as cardholder_id, ch.first_name, ch.last_name, ch.photo, d.friendly_name AS gate_name, c.friendly_name AS controller_name, d.door_record_id, p.street_address
+        $query = $wpdb->prepare("SELECT l.event_timestamp, l.access_granted, l.event_description, l.rfid_id, l.controller_identifier, ch.id as cardholder_id, ch.first_name, ch.last_name, ch.photo, d.friendly_name AS gate_name, c.friendly_name AS controller_name, d.door_record_id, p.street_address
              FROM {$log_table} AS l
              LEFT JOIN {$cardholders_table} AS ch ON l.cardholder_id = ch.id
              LEFT JOIN {$controllers_table} AS c ON l.controller_identifier = c.uhppoted_device_id
-             LEFT JOIN ac_credentials AS cred ON ch.id = cred.cardholder_id AND cred.credential_type = 'MIFARE_BADGE'
              LEFT JOIN {$doors_table} AS d ON c.controller_record_id = d.controller_record_id AND l.door_number = d.door_number_on_controller
              LEFT JOIN {$property_table} AS p ON ch.property_id = p.property_id
              WHERE l.log_id = %d",
@@ -249,7 +248,7 @@ class Fsbhoa_Monitor_REST_API {
             'timestamp'      => date('g:i:s A', strtotime($event['event_timestamp'])),
             'eventMessage'   => $event['event_description'],
             'controller_identifier' => $event['controller_identifier'],
-            'cardNumber'     => (int)ltrim($event['rfid_id'], '0'),
+            'cardNumber'     => (int)ltrim((string)$event['rfid_id'], '0'),
             'doorRecordId'   => (int)$event['door_record_id'],
             'streetAddress'  => $event['street_address'] ?? 'N/A',
         ];
@@ -287,7 +286,7 @@ class Fsbhoa_Monitor_REST_API {
                 'gateName'       => $event['gate_name'] ?: ($event['controller_name'] ?: 'Unknown Gate'),
                 'timestamp'      => date('g:i:s A', strtotime($event['event_timestamp'])),
                 'eventMessage'   => $event['event_description'],
-                'cardNumber'     => (int)ltrim($event['rfid_id'], '0'),
+                'cardNumber'     => (int)ltrim((string)$event['rfid_id'], '0'),
                 'controller_identifier' => $event['controller_identifier'],
                 'doorRecordId'   => (int)$event['door_record_id'],
                 'streetAddress'  => $event['street_address'] ?? 'N/A',
@@ -308,12 +307,11 @@ class Fsbhoa_Monitor_REST_API {
 
         // It uses the database's internal clock, to get records in the last 24 hrs.
         $query = "SELECT l.log_id, l.event_timestamp, l.access_granted, 
-            l.event_description, cred.credential_value AS rfid_id, 
+            l.event_description, l.rfid_id, 
             l.controller_identifier, ch.id AS cardholder_id, ch.first_name, ch.last_name, 
             ch.photo, d.friendly_name AS gate_name, c.friendly_name AS controller_name, d.door_record_id, p.street_address
             FROM {$log_table} AS l
             LEFT JOIN {$cardholders_table} AS ch ON l.cardholder_id = ch.id
-            LEFT JOIN ac_credentials AS cred ON ch.id = cred.cardholder_id AND cred.credential_type = 'MIFARE_BADGE'
             LEFT JOIN {$controllers_table} AS c ON l.controller_identifier = c.uhppoted_device_id
             LEFT JOIN {$doors_table} AS d ON c.controller_record_id = d.controller_record_id AND l.door_number = d.door_number_on_controller
             LEFT JOIN {$property_table} AS p ON ch.property_id = p.property_id
