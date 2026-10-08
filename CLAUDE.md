@@ -16,7 +16,7 @@ The **core WordPress plugin**, plus one Go backend service (`monitor_service`).
 - The UI is primarily **front-end pages rendered via shortcodes** (`includes/class-fsbhoa-shortcodes.php`: `[fsbhoa_cardholder_management]`, `[fsbhoa_live_monitor]`, `[fsbhoa_vendor_management]`, etc.), which is why `WP_List_Table` is loaded outside admin. The site forces login for all front-end pages.
 - REST routes: `/monitor/*`, `/reports/*`, `/test/*`, `/access/*`.
 - JS/CSS per module in `assets/js`, `assets/css`; third-party libs (jQuery UI, DataTables, Chart.js, Croppie, Tailwind) are vendored in `assets/vendor`.
-- Cron scheduling for the nightly rebuild / daily time sync is in `fsbhoa_schedule_cron_jobs()` in `fsbhoa-ac-core.php`.
+- The nightly rebuild / daily time sync cron hooks are scheduled and handled in `fsbhoa_ac_uhppote`, not core (see ARCHITECTURE.md).
 
 ### Schema changes — keep three files in sync
 - `includes/class-fsbhoa-core-repository.php` → `create_tables()` (runs on activation; `CREATE TABLE IF NOT EXISTS`)

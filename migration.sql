@@ -230,4 +230,16 @@ ALTER TABLE `ac_households`
 ALTER TABLE `ac_doors`
   ADD COLUMN IF NOT EXISTS `ip_address` varchar(45) DEFAULT NULL COMMENT 'Network address of the device at this door (e.g. a kiosk station browser).' AFTER `door_delay`;
 
+-- ==============================================================================
+-- STEP 7: TEST door role (system doors for automated tests, hidden from the live monitor map)
+-- ==============================================================================
+ALTER TABLE `ac_doors`
+  MODIFY COLUMN `door_role` enum('INNER_GATE','ENTRY_GATE','PERIMETER','KIOSK','TEST') DEFAULT NULL COMMENT 'TEST = system door for automated tests; hidden from the live monitor map.';
+
+-- The Regression Test Controller's door (created by fsbhoa_ac_uhppote) was stored as KIOSK.
+UPDATE `ac_doors` d
+  JOIN `ac_controllers` c ON d.controller_record_id = c.controller_record_id
+  SET d.door_role = 'TEST'
+  WHERE c.uhppoted_device_id = 88888888;
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -105,7 +105,7 @@ class Fsbhoa_Monitor_REST_API {
         $role_filter = $request->get_param('role');
         
         $query = "
-            SELECT d.door_record_id, d.friendly_name, d.door_number_on_controller, d.map_x, d.map_y, c.uhppoted_device_id
+            SELECT d.door_record_id, d.friendly_name, d.door_number_on_controller, d.map_x, d.map_y, d.door_role, c.uhppoted_device_id
             FROM {$doors_table} d
             JOIN {$controllers_table} c ON d.controller_record_id = c.controller_record_id
         ";
@@ -121,7 +121,11 @@ class Fsbhoa_Monitor_REST_API {
         if ( $wpdb->last_error ) {
             return new WP_Error( 'db_error', 'Database error fetching gates.', array( 'status' => 500, 'db_error' => $wpdb->last_error ) );
         }
-        return new WP_REST_Response( $gates ?? [], 200 );
+
+        // Let extension plugins remove doors that have no place on the map (e.g. a virtual station).
+        $gates = array_values( (array) apply_filters( 'fsbhoa_monitor_map_gates', $gates ?? [] ) );
+
+        return new WP_REST_Response( $gates, 200 );
     }
 
     /**

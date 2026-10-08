@@ -142,7 +142,7 @@ class Fsbhoa_Core_Repository {
             `map_x` int DEFAULT '0',
             `map_y` int DEFAULT '0',
             `amenity_role` varchar(20) DEFAULT NULL,
-            `door_role` enum('INNER_GATE','ENTRY_GATE','PERIMETER','KIOSK') DEFAULT NULL,
+            `door_role` enum('INNER_GATE','ENTRY_GATE','PERIMETER','KIOSK','TEST') DEFAULT NULL COMMENT 'TEST = system door for automated tests; hidden from the live monitor map.',
             `amenity_id` varchar(255) DEFAULT NULL COMMENT 'Comma-separated list of amenity IDs covered by this door.',
             `door_delay` tinyint UNSIGNED NOT NULL DEFAULT '3' COMMENT 'Seconds the relay remains energized (UHPPOTE door-delay)',
             `ip_address` varchar(45) DEFAULT NULL COMMENT 'Network address of the device at this door (e.g. a kiosk station browser).',

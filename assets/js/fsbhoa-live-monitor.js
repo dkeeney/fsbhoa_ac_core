@@ -355,6 +355,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Helper function to draw the dots (extracted to avoid code duplication)
     function renderGates(gatesData) {
         gatesData.forEach(gate => {
+            // Skip system doors used by automated tests
+            if (gate.door_role === 'TEST') {
+                return;
+            }
             gates[gate.door_record_id] = gate;
 
             const light = document.createElement('div');
@@ -589,8 +593,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-
-
+    // Add the main event listener to the map container
+    if (mapContainer) {
+        mapContainer.addEventListener('click', handleGateClick);
+    }
 
     // Run all initialization tasks, then connect the WebSocket.
     Promise.all([

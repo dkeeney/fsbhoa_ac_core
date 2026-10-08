@@ -23,10 +23,12 @@ Core exposes extension points via WordPress hooks; extensions implement them. Wh
 - Lifecycle events: `fsbhoa_core_cardholder_created/updated/restored`, `fsbhoa_core_cardholders_merged`, `fsbhoa_core_cardholder_household_changed`, `fsbhoa_core_vehicle_saved/deleted`, `fsbhoa_core_group_saved`, `fsbhoa_core_amenities_changed`, `fsbhoa_pending_change_{type}`
 - Hardware abstraction filters: `fsbhoa_hardware_set_door_state`, `fsbhoa_hardware_map_event_data`, `fsbhoa_hardware_group_status`, `fsbhoa_validate_credentials`
 - Vehicle UI/validation: `fsbhoa_vehicle_table_head`, `fsbhoa_vehicle_table_row_columns`, `fsbhoa_is_vehicle_row_empty`, `fsbhoa_validate_vehicle_row`
-- UI injection: `fsbhoa_render_credential_fields`, `fsbhoa_register_admin_submenus`, `fsbhoa_hardware_management_view_{view}`, `fsbhoa_render_hardware_task_lists`, `fsbhoa_cardholder_list_status_icons`, `fsbhoa_cardholder_list_action_icons`, `fsbhoa_enqueue_cardholder_assets`
+- UI injection: `fsbhoa_render_credential_fields`, `fsbhoa_monitor_map_gates` (remove doors from the live monitor map and map editor), `fsbhoa_register_admin_submenus`, `fsbhoa_hardware_management_view_{view}`, `fsbhoa_render_hardware_task_lists`, `fsbhoa_cardholder_list_status_icons`, `fsbhoa_cardholder_list_action_icons`, `fsbhoa_enqueue_cardholder_assets`
 - Services/config: `fsbhoa_system_services`, `fsbhoa_update_service_configs`
 
-Cron hooks `fsbhoa_run_nightly_rebuild` (00:00) and `fsbhoa_run_daily_time_sync` (03:05) are scheduled in core but **handled in extension plugins** (e.g. `fsbhoa_ac_uhppote/includes/fsbhoa-uhppote-sync-service.php`). The V2 permission compiler / delta-sync design is documented in `fsbhoa_ac_core/includes/fsbhoa-permissions-V2.md`.
+Cron hooks `fsbhoa_run_nightly_rebuild` and `fsbhoa_run_daily_time_sync` are **handled in extension plugins** (e.g. `fsbhoa_ac_uhppote/includes/fsbhoa-uhppote-sync-service.php`). Two things are needed for them to run:
+- **WP-Cron schedule.** `fsbhoa_ac_uhppote` schedules both hooks (`fsbhoa_schedule_sync_events()`, on `init`) at 00:10 and 03:10 local time. It reschedules them if they drift by more than 10 minutes, such as after a DST change. Core does not schedule them.
+- **System crontab.** WP-Cron runs only when a request reaches the site, so each server needs a crontab entry that requests `wp-cron.php` just after those times (00:11 and 03:11). The example is in the docblock of `fsbhoa_schedule_sync_events()`. The V2 permission compiler / delta-sync design is documented in `fsbhoa_ac_core/includes/fsbhoa-permissions-V2.md`.
 
 ## Environment separation (testbed vs. production)
 
