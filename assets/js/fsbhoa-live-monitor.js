@@ -464,30 +464,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function setupEventListClickHandlers() {
-        const handleCardClick = function (e) {
-            const item = e.target.closest('li[data-cardholder-id]');
-            if (!item) return;
-
-            const cardholderId = item.dataset.cardholderId;
-            if (!cardholderId) return;
-
-            // Target URL for cardholder edit
-            const editUrl = `/cardholder/?action=edit_cardholder&cardholder_id=${encodeURIComponent(cardholderId)}`;
-            window.open(editUrl, '_blank');
-        };
-
-        const pedList = document.getElementById('event-list');
-        if (pedList) {
-            pedList.addEventListener('click', handleCardClick);
-        }
-
-        const vehList = document.getElementById('vehicle-event-list');
-        if (vehList) {
-            vehList.addEventListener('click', handleCardClick);
-        }
-    }
-
     async function updateAccessStatus() {
         try {
             const response = await fetch(STATUS_API_URL, { headers: REST_HEADERS });
