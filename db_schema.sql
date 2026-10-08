@@ -117,7 +117,7 @@ CREATE TABLE `ac_controllers` (
   `notes` text DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `type` enum('UHPPOTE','VIRTUAL_KIOSK') NOT NULL DEFAULT 'UHPPOTE' COMMENT 'Defines the functional class of the device.'
+  `type` enum('UHPPOTE','VIRTUAL_KIOSK','REGRESSION_TEST') NOT NULL DEFAULT 'UHPPOTE' COMMENT 'Defines the functional class of the device. REGRESSION_TEST = fake controller 88888888 for automated tests (never synced).'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- --------------------------------------------------------

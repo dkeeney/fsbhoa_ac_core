@@ -254,4 +254,13 @@ UPDATE `ac_cardholders` SET `cardholder_status` = 'active' WHERE `cardholder_sta
 -- Vendors are never archived (there is no restore or merge for them): they go straight to purged.
 UPDATE `ac_cardholders` SET `cardholder_status` = 'purged' WHERE `cardholder_type` = 'vendor' AND `cardholder_status` = 'archived';
 
+-- ==============================================================================
+-- STEP 9: REGRESSION_TEST controller type
+-- ==============================================================================
+-- fsbhoa_ac_uhppote creates the fake Regression Test Controller (88888888) with this type.
+-- It wasn't in the enum, so the row was stored with a blank type.
+ALTER TABLE `ac_controllers`
+  MODIFY COLUMN `type` enum('UHPPOTE','VIRTUAL_KIOSK','REGRESSION_TEST') NOT NULL DEFAULT 'UHPPOTE' COMMENT 'Defines the functional class of the device. REGRESSION_TEST = fake controller 88888888 for automated tests (never synced).';
+UPDATE `ac_controllers` SET `type` = 'REGRESSION_TEST' WHERE `uhppoted_device_id` = 88888888;
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -123,7 +123,7 @@ class Fsbhoa_Core_Repository {
             `notes` text,
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            `type` enum('UHPPOTE','VIRTUAL_KIOSK') NOT NULL DEFAULT 'UHPPOTE' COMMENT 'Defines the functional class of the device.',
+            `type` enum('UHPPOTE','VIRTUAL_KIOSK','REGRESSION_TEST') NOT NULL DEFAULT 'UHPPOTE' COMMENT 'Defines the functional class of the device. REGRESSION_TEST = fake controller 88888888 for automated tests (never synced).',
             PRIMARY KEY (`controller_record_id`),
             UNIQUE KEY `idx_uhppoted_device_id_unique` (`uhppoted_device_id`),
             UNIQUE KEY `idx_friendly_name_unique` (`friendly_name`)
