@@ -32,10 +32,12 @@ function fsbhoa_archive_and_delete_cardholder( $cardholder_id ) {
     $groups_csv = implode( ',', $group_ids );
 
     // 2. Atomically update the cardholder record to mark it as archived.
+    // Vendors are never archived (there is no restore or merge for them): they go straight to purged.
+    $cardholder_type = $wpdb->get_var( $wpdb->prepare( "SELECT cardholder_type FROM {$table_cardholders} WHERE id = %d", $cardholder_id ) );
     $updated = $wpdb->update(
         $table_cardholders,
         [
-            'cardholder_status' => 'archived',
+            'cardholder_status' => ( 'vendor' === $cardholder_type ) ? 'purged' : 'archived',
             'deleted_at'  => current_time( 'mysql', 1 ), // Use WordPress's timezone-aware timestamp
             'groups_csv'  => $groups_csv
         ],
@@ -47,8 +49,8 @@ function fsbhoa_archive_and_delete_cardholder( $cardholder_id ) {
     if ( false === $updated ) {
         return new WP_Error( 'db_error_update', 'Database error while archiving the cardholder. DB Error: ' . esc_html( $wpdb->last_error ) );
     }
-    // --- Deactivate all credentials belonging to this archived user ---
-    $wpdb->update('ac_credentials', ['status' => 'archived'], ['cardholder_id' => $cardholder_id], ['%s'], ['%d']);
+    // Credentials keep their status, so a restore gets them back as they were. Archived and purged
+    // cardholders' credentials are never sent anywhere: every push selects only active cardholders.
 
     // 3. For security, remove all active group memberships to revoke permissions immediately.
     $deleted = $wpdb->delete( $table_memberships, [ 'cardholder_id' => $cardholder_id ], [ '%d' ] );
@@ -64,8 +66,8 @@ function fsbhoa_archive_and_delete_cardholder( $cardholder_id ) {
 
 /**
  * Universal helper to restore an archived cardholder.
- * Resolves household placement, re-evaluates active status, restores groups_csv,
- * re-activates credentials, logs changes, and fires the core lifecycle hook.
+ * Resolves household placement, sets the status to active, restores groups_csv,
+ * keeps each credential's status, logs changes, and fires the core lifecycle hook.
  *
  * @param int      $cardholder_id The ID of the cardholder to restore.
  * @param int|null $target_household_id Optional explicit household ID. If null, auto-resolves.
@@ -102,7 +104,7 @@ function fsbhoa_restore_cardholder( $cardholder_id, $target_household_id = null 
         $active_resident = $wpdb->get_row( $wpdb->prepare(
             "SELECT household_id FROM {$table_cardholders}
              WHERE property_id = %d
-               AND cardholder_status IN ('active', 'inactive')
+               AND cardholder_status = 'active'
                AND cardholder_type = 'resident'
                AND household_id IS NOT NULL AND household_id > 0
              LIMIT 1",
@@ -117,12 +119,9 @@ function fsbhoa_restore_cardholder( $cardholder_id, $target_household_id = null 
         }
     }
 
-    // 3. Determine Status: 'active' if they possess valid credentials, else 'inactive'
-    $has_credential = $wpdb->get_var( $wpdb->prepare(
-        "SELECT id FROM ac_credentials WHERE cardholder_id = %d LIMIT 1",
-        $cardholder_id
-    ) );
-    $new_status = $has_credential ? 'active' : 'inactive';
+    // 3. A restored cardholder is current again. Cardholder status says only whether someone is
+    // current; whether they have a badge comes from their credentials.
+    $new_status = 'active';
 
     // 4. Update the cardholder row
     $updated = $wpdb->update(
@@ -157,14 +156,26 @@ function fsbhoa_restore_cardholder( $cardholder_id, $target_household_id = null 
         }
     }
 
-    // 6. Reactivate Credentials in Database
-    $wpdb->update(
-        'ac_credentials',
-        [ 'status' => 'active' ],
-        [ 'cardholder_id' => $cardholder_id ],
-        [ '%s' ],
-        [ '%d' ]
-    );
+    // 6. Credentials keep the status they had when archived (a disabled badge stays disabled).
+    // Older archives blanked the status ('archived' isn't in the enum); that original is lost, so use 'active'.
+    $wpdb->query( $wpdb->prepare(
+        "UPDATE ac_credentials SET status = 'active' WHERE cardholder_id = %d AND status = ''",
+        $cardholder_id
+    ) );
+    // A badge whose number now belongs to another current cardholder was reissued: it can't come back.
+    $reissued = $wpdb->get_results( $wpdb->prepare(
+        "SELECT mine.id, mine.credential_value, other.cardholder_id AS holder_id
+         FROM ac_credentials mine
+         JOIN ac_credentials other ON other.credential_value = mine.credential_value
+              AND other.credential_type = 'MIFARE_BADGE' AND other.cardholder_id != mine.cardholder_id
+         JOIN ac_cardholders och ON och.id = other.cardholder_id AND och.cardholder_status = 'active'
+         WHERE mine.cardholder_id = %d AND mine.credential_type = 'MIFARE_BADGE'",
+        $cardholder_id
+    ) );
+    foreach ( $reissued as $r ) {
+        $wpdb->delete( 'ac_credentials', [ 'id' => $r->id ], [ '%d' ] );
+        error_log( "FSBHOA RESTORE: Cardholder {$cardholder_id}: removed badge {$r->credential_value}, which now belongs to cardholder {$r->holder_id}." );
+    }
 
     // 7. Fire the Core Lifecycle Hook (DoorKing synchronizes DIR, ENTRY, OPT_IN here)
     do_action( 'fsbhoa_core_cardholder_restored', $cardholder_id );
@@ -240,7 +251,7 @@ function fsbhoa_merge_cardholders( $destination_id, $source_id ) {
             $wpdb->delete( 'ac_credentials', [ 'id' => $cred->id ], [ '%d' ] );
         } else {
             $result = $wpdb->query( $wpdb->prepare(
-                "UPDATE ac_credentials SET cardholder_id = %d, status = 'active' WHERE id = %d",
+                "UPDATE ac_credentials SET cardholder_id = %d, status = IF(status = '', 'active', status) WHERE id = %d",
                 $destination_id, $cred->id
             ) );
             if ( false === $result && ! empty( $wpdb->last_error ) ) {
@@ -250,9 +261,8 @@ function fsbhoa_merge_cardholders( $destination_id, $source_id ) {
         }
     }
 
-    // 2. Evaluate active status for destination cardholder
-    $has_any_cred = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM ac_credentials WHERE cardholder_id = %d AND status = 'active' LIMIT 1", $destination_id ) );
-    $new_status = $has_any_cred ? 'active' : 'inactive';
+    // 2. The merged cardholder is current (status doesn't depend on credentials)
+    $new_status = 'active';
 
     $manual_property_id = ! empty( $source_record['property_id'] ) ? absint( $source_record['property_id'] ) : 0;
 
@@ -382,7 +392,7 @@ function fsbhoa_change_cardholder_resident_type( $cardholder_id, $new_type ) {
         $target_household_id = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT household_id FROM ac_cardholders
              WHERE property_id = %d
-               AND cardholder_status IN ('active', 'inactive')
+               AND cardholder_status = 'active'
                AND resident_type = 'Landlord'
                AND id != %d
                AND household_id IS NOT NULL
@@ -393,7 +403,7 @@ function fsbhoa_change_cardholder_resident_type( $cardholder_id, $new_type ) {
         $target_household_id = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT household_id FROM ac_cardholders
              WHERE property_id = %d
-               AND cardholder_status IN ('active', 'inactive')
+               AND cardholder_status = 'active'
                AND resident_type != 'Landlord'
                AND resident_type NOT IN ('Contractor', 'Staff', 'Other', 'Emergency', 'Delivery')
                AND id != %d

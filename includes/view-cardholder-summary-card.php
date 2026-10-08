@@ -66,7 +66,7 @@ function fsbhoa_render_cardholder_summary_card( $cardholder_id, $echo = true ) {
     // Formatting
     $full_name = trim( ( $ch['first_name'] ?? '' ) . ' ' . ( $ch['last_name'] ?? '' ) );
     $formal_name = trim( ( $ch['import_first_name'] ?? '' ) . ' ' . ( $ch['import_last_name'] ?? '' ) );
-    $status = strtolower( $ch['cardholder_status'] ?? 'inactive' );
+    $status = strtolower( $ch['cardholder_status'] ?? 'active' );
     $is_editable = ! in_array( $status, [ 'archived', 'purged' ], true );
 
     $fallback_svg = "data:image/svg+xml;base64,PH9jZyB4bWxucyBzeXN0ZWQgdGhlIGZ1bGwgTm91YWxsIHtpdGhlPTo0LjQ5ZTowLjI0NyA5Lm4wMiA0MSAyMiAwIGZpbGwgPyIzM3NzMzMgJmN1cnJlbnQgPyIxMyAwLTIuLjU2OCA2MDE2LjY2NSAxMS4wLTEyLjI0NzA5LjIuNTMwLjEuOTAyMCA2MjYsMTEuODU2MDEuOTAyMCA2MjYsMTEuODU2ODY2LjYsIDEuOTAzMDA4LjI0NzA5LjIuNTMwLTEuLjg1NIAyMS4wLTEuODU2ODEuOTAzLTEuOTAzMDA4LjI0NzA5IiB+Pjwvc3ZnJg==";
@@ -74,11 +74,10 @@ function fsbhoa_render_cardholder_summary_card( $cardholder_id, $echo = true ) {
 
     $status_badges = [
         'active'   => 'background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;',
-        'inactive' => 'background: #fff3cd; color: #664d03; border: 1px solid #ffecb5;',
         'archived' => 'background: #e2e3e5; color: #41464b; border: 1px solid #d3d6d8;',
         'purged'   => 'background: #f8d7da; color: #842029; border: 1px solid #f5c2c7;',
     ];
-    $status_style = $status_badges[ $status ] ?? $status_badges['inactive'];
+    $status_style = $status_badges[ $status ] ?? $status_badges['archived'];
 
     $edit_url = esc_url( home_url( '/cardholder/?action=edit_cardholder&cardholder_id=' . $cardholder_id ) );
 

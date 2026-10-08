@@ -32,7 +32,7 @@ class Fsbhoa_Cardholder_Admin_Page {
             'first_name' => '', 'last_name' => '', 'title' => '', 'email' => '', 'phone' => '', 'phone_type' => '',
             'import_first_name' => '', 'import_last_name' => '', 'email_used' => 0,
             'resident_type' => '', 'property_id' => '', 'property_address_display' => '', 'photo' => null,
-            'notes' => '', 'cardholder_status' => 'inactive',
+            'notes' => '', 'cardholder_status' => 'active',
             'origin' => 'manual', 'photo_base64' => '',
         );
         $errors = array();

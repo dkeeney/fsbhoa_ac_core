@@ -194,7 +194,8 @@ function fsbhoa_render_cardholder_list_view() {
                                         ?>
                                     </div>
 
-                                    <span><?php echo esc_html( ucwords( $cardholder['cardholder_status'] ) ); ?></span>
+                                    <?php // Badge status from the hardware plugin (cardholder status is always active here) ?>
+                                    <span><?php echo esc_html( ucwords( apply_filters( 'fsbhoa_cardholder_list_card_status', '', $cardholder ) ) ); ?></span>
                                 </div>
                             </td>
                             <td class="fsbhoa-type-column">

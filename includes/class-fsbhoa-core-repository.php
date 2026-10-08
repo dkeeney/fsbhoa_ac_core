@@ -65,7 +65,7 @@ class Fsbhoa_Core_Repository {
             `phone` varchar(30) DEFAULT NULL,
             `phone_type` varchar(10) DEFAULT 'Mobile',
             `photo` longblob,
-            `cardholder_status` varchar(20) NOT NULL DEFAULT 'inactive',
+            `cardholder_status` varchar(20) NOT NULL DEFAULT 'active' COMMENT 'active = current; archived; purged. Vendors are never archived. Badge status is in ac_credentials.',
             `cardholder_type` enum('resident','vendor') NOT NULL DEFAULT 'resident',
             `notes` text,
             `resident_type` varchar(50) DEFAULT 'Resident Owner',

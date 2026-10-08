@@ -102,8 +102,8 @@ class Fsbhoa_Vendor_Admin_Page {
             wp_die( esc_html( implode( ', ', $credential_results['errors'] ) ) );
         }
 
-        // Cardholder status is determined by sub-plugin credential validation
-        $cardholder_status = $credential_results['data']['cardholder_status'] ?? 'inactive';
+        // Cardholder status only says whether the vendor is current; credentials don't change it
+        $cardholder_status = ( $is_update && ! empty( $existing_data['cardholder_status'] ) ) ? $existing_data['cardholder_status'] : 'active';
 
         // 3. Resolve 1:1 Household Container
         $cardholder_display_name = trim( $first_name . ' ' . $last_name );
@@ -293,14 +293,7 @@ class Fsbhoa_Vendor_Admin_Page {
         global $wpdb;
         $cardholder_id = absint( $cardholder_id );
 
-        // 1. Mark credentials archived so they can't open gates
-        $wpdb->update(
-            'ac_credentials',
-            [ 'status' => 'archived' ],
-            [ 'cardholder_id' => $cardholder_id ],
-            [ '%s' ],
-            [ '%d' ]
-        );
+        // 1. Credentials keep their status: purged cardholders' credentials are never sent anywhere.
 
         // 2. Strip active group memberships to revoke hardware permissions immediately
         $wpdb->delete( 'ac_cardholder_groups', [ 'cardholder_id' => $cardholder_id ], [ '%d' ] );

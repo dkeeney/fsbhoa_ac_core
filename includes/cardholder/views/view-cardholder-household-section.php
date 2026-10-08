@@ -69,7 +69,7 @@ function fsbhoa_render_household_section( $form_data, $is_edit_mode ) {
         $existing_household_member = $wpdb->get_row($wpdb->prepare(
             "SELECT household_id FROM ac_cardholders
              WHERE property_id = %d
-               AND cardholder_status IN ('active', 'inactive')
+               AND cardholder_status = 'active'
                AND resident_type = 'Landlord'
                AND household_id IS NOT NULL
                {$exclude_sql}
@@ -81,7 +81,7 @@ function fsbhoa_render_household_section( $form_data, $is_edit_mode ) {
         $existing_household_member = $wpdb->get_row($wpdb->prepare(
             "SELECT household_id FROM ac_cardholders
              WHERE property_id = %d
-               AND cardholder_status IN ('active', 'inactive')
+               AND cardholder_status = 'active'
                AND resident_type != 'Landlord'
                AND resident_type NOT IN ('Contractor', 'Staff', 'Other', 'Emergency', 'Delivery')
                AND household_id IS NOT NULL

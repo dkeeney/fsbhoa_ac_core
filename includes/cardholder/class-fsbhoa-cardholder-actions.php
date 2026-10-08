@@ -89,7 +89,7 @@ class Fsbhoa_Cardholder_Actions {
 			 FROM ac_cardholders
 			 WHERE property_id = %d
                AND cardholder_type = 'resident'
-			   AND cardholder_status IN ('active', 'inactive', 'archived')
+			   AND cardholder_status IN ('active', 'archived')
 			 ORDER BY cardholder_status ASC, first_name ASC",
 			$property_id
 		) );
@@ -394,6 +394,10 @@ class Fsbhoa_Cardholder_Actions {
         // 3. Separate Cardholder Data from Vehicle Data
         $data_to_save = array_merge($existing_data, $profile_results['data'], $address_results['data'], $photo_results['data'], $credential_results['data']);
         $data_to_save['cardholder_type'] = 'resident';
+        // Cardholder status only says whether someone is current; credentials don't change it
+        if ( ! $is_update ) {
+            $data_to_save['cardholder_status'] = 'active';
+        }
 
         $vehicles_to_save = $vehicle_results['data']['vehicle_rows'] ?? [];
 
@@ -615,8 +619,7 @@ class Fsbhoa_Cardholder_Actions {
         $properties_table = 'ac_property';
         $wildcard_term = '%' . $wpdb->esc_like($term) . '%';
 
-        // UPDATED QUERY: Added a WHERE clause to ensure we only search for active,
-        // inactive, or disabled users, excluding archived and purged ones.
+        // Only current cardholders: archived and purged ones are excluded.
         $results = $wpdb->get_results($wpdb->prepare(
             "SELECT c.id, c.first_name, c.last_name, p.street_address,
                     GROUP_CONCAT(cred.credential_value SEPARATOR ', ') as all_credentials

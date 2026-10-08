@@ -25,7 +25,7 @@ function fsbhoa_render_vendor_form_view( $vendor_id = 0 ) {
         'phone'             => '',
         'phone_type'        => 'Mobile',
         'notes'             => '',
-        'cardholder_status' => 'inactive',
+        'cardholder_status' => 'active',
         'photo_base64'      => '',
     );
 

@@ -99,7 +99,7 @@ ON DUPLICATE KEY UPDATE description=VALUES(description);
 -- STEP 2: Evolve ac_cardholders Schema
 -- ==============================================================================
 ALTER TABLE `ac_cardholders`
-  CHANGE COLUMN `card_status` `cardholder_status` varchar(20) NOT NULL DEFAULT 'inactive';
+  CHANGE COLUMN `card_status` `cardholder_status` varchar(20) NOT NULL DEFAULT 'active' COMMENT 'active = current; archived; purged. Vendors are never archived. Badge status is in ac_credentials.';
 
 ALTER TABLE `ac_cardholders`
   ADD COLUMN `company` varchar(100) DEFAULT NULL AFTER `last_name`,
@@ -197,10 +197,12 @@ SELECT
   `id` AS `cardholder_id`,
   'MIFARE_BADGE' AS `credential_type`,
   `rfid_id` AS `credential_value`,
+  -- V1 had one status: 'inactive' meant no RFID, so every row here had a badge that was active or disabled.
+  -- Archived and purged cardholders lost which one it was, so their badge is 'active'
+  -- (the sync leaves archived and purged cardholders out whatever their badge status).
   CASE
-    WHEN `cardholder_status` = 'active' THEN 'active'
     WHEN `cardholder_status` = 'disabled' THEN 'disabled'
-    ELSE 'inactive'
+    ELSE 'active'
   END AS `status`,
   COALESCE(`card_issue_date`, CURRENT_DATE) AS `issue_date`,
   COALESCE(`card_expiry_date`, '2099-12-31 23:59:59') AS `expiration_date`
@@ -241,5 +243,15 @@ UPDATE `ac_doors` d
   JOIN `ac_controllers` c ON d.controller_record_id = c.controller_record_id
   SET d.door_role = 'TEST'
   WHERE c.uhppoted_device_id = 88888888;
+
+-- ==============================================================================
+-- STEP 8: Cardholder status says only whether someone is current (active, archived, purged)
+-- ==============================================================================
+-- V1 used 'inactive' for "no badge" and 'disabled' for a disabled badge. Whether someone has a
+-- badge, and whether it is disabled, now comes from ac_credentials (step 4 must run first).
+UPDATE `ac_cardholders` SET `cardholder_status` = 'active' WHERE `cardholder_status` IN ('inactive', 'disabled');
+
+-- Vendors are never archived (there is no restore or merge for them): they go straight to purged.
+UPDATE `ac_cardholders` SET `cardholder_status` = 'purged' WHERE `cardholder_type` = 'vendor' AND `cardholder_status` = 'archived';
 
 SET FOREIGN_KEY_CHECKS = 1;
