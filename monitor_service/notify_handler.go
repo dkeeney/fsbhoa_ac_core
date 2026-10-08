@@ -58,6 +58,8 @@ func fetchEventFromWordPress(config *Config, eventID int) (map[string]interface{
 	if config.WordPressToken != "" {
 		req.Header.Set("Authorization", "Bearer "+config.WordPressToken)
 	}
+	// /monitor/event requires the Access Verification API Key
+	req.Header.Set("X-API-KEY", config.APIKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

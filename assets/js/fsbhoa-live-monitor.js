@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const WS_URL = fsbhoa_monitor_vars.ws_url || ''; 
     const STATUS_API_URL = '/wp-json/fsbhoa/v1/monitor/group-status';
     const SCHEDULE_API_URL = '/wp-json/fsbhoa/v1/monitor/current-schedule';
+    // The monitor REST routes require a logged-in admin; WordPress needs the nonce to recognize the user.
+    const REST_HEADERS = { 'X-WP-Nonce': fsbhoa_monitor_vars.nonce };
     let gateAccessStatus = {}; // Stores { doorId: true/false } from the API
     let gateHardwareStatus = {}; // Stores { doorId: 'locked'/'unlocked'/'intermediate' } from WebSocket
 
@@ -340,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // CHECK 2: Fallback to network request if pre-load failed
         try {
             console.log("Monitor: Fetching gate data from API...");
-            const response = await fetch(GATES_API_URL);
+            const response = await fetch(GATES_API_URL, { headers: REST_HEADERS });
             if (!response.ok) {
                 throw new Error(`Failed to fetch gates: ${response.statusText}`);
             }
@@ -374,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function () {
     async function loadRecentActivity() {
         const ACTIVITY_API_URL = '/wp-json/fsbhoa/v1/monitor/recent-activity';
         try {
-            const response = await fetch(ACTIVITY_API_URL);
+            const response = await fetch(ACTIVITY_API_URL, { headers: REST_HEADERS });
             if (!response.ok) {
                 throw new Error(`Failed to fetch recent activity: ${response.statusText}`);
             }
@@ -423,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
     async function updateCurrentSchedule() {
         if (!scheduleName || !scheduleIndicator) return;
         try {
-            const response = await fetch(SCHEDULE_API_URL);
+            const response = await fetch(SCHEDULE_API_URL, { headers: REST_HEADERS });
             if (!response.ok) return; // Silent fail
             const data = await response.json();
 
@@ -488,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function updateAccessStatus() {
         try {
-            const response = await fetch(STATUS_API_URL);
+            const response = await fetch(STATUS_API_URL, { headers: REST_HEADERS });
             if (!response.ok) return; // Silent fail
             const newStatus = await response.json();
             
@@ -552,7 +554,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             const endpoint = `/wp-json/fsbhoa/v1/monitor/cardholder-summary?cardholder_id=${encodeURIComponent(cardholderId)}`;
-            const response = await fetch(endpoint);
+            const response = await fetch(endpoint, { headers: REST_HEADERS });
             if (!response.ok) {
                 throw new Error(`Failed to load cardholder (${response.statusText})`);
             }

@@ -18,7 +18,7 @@ class Fsbhoa_Monitor_REST_API {
         register_rest_route( $this->namespace, '/monitor/event', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_event_by_id_callback' ),
-            'permission_callback' => '__return_true', // Should be secured with an API key
+            'permission_callback' => array( 'Fsbhoa_Verification_REST_API', 'api_key_permission_check' ), // monitor_service sends X-API-KEY
              'args'               => array(
                 'record_id' => array(
                     'required'          => true,
@@ -31,7 +31,7 @@ class Fsbhoa_Monitor_REST_API {
         register_rest_route( $this->namespace, '/monitor/cardholder-summary', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_cardholder_summary_callback' ),
-            'permission_callback' => '__return_true',
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
             'args'                => array(
                 'cardholder_id' => array(
                     'required'          => true,
@@ -44,54 +44,52 @@ class Fsbhoa_Monitor_REST_API {
         register_rest_route( $this->namespace, '/monitor/gates', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_all_gates_callback' ),
-            'permission_callback' => '__return_true',
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
         ) );
 
         // This route is called by the Go event_service to log a raw hardware event to the database
         register_rest_route( $this->namespace, '/monitor/log-event', array(
             'methods'             => 'POST',
             'callback'            => array( $this, 'log_event_callback' ),
-            'permission_callback' => '__return_true', // Internal service-to-service call
+            'permission_callback' => array( 'Fsbhoa_Verification_REST_API', 'api_key_permission_check' ), // Services send X-API-KEY
         ) );
 
         // This route is called by the monitor page to get recent historical events
         register_rest_route( $this->namespace, '/monitor/recent-activity', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_recent_activity_callback' ),
-            'permission_callback' => '__return_true',
-        ) );
-
-        // This route is called by the monitor page to manually set a door's state
-        register_rest_route( $this->namespace, '/monitor/set-door-state', array(
-            'methods'             => 'POST',
-            'callback'            => array( $this, 'set_door_state_callback' ),
-            'permission_callback' => function () {
-                return current_user_can('manage_options');
-            },
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
         ) );
 
         // This route is called by the monitor page to check if the status group (Residents) has access now
         register_rest_route( $this->namespace, '/monitor/group-status', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_group_status_callback' ),
-            'permission_callback' => '__return_true', // Public read-only status
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
         ) );
 
         // This route is called by the monitor page to get the current active schedule name
         register_rest_route( $this->namespace, '/monitor/current-schedule', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_current_schedule_callback' ),
-            'permission_callback' => '__return_true', // Public read-only for the monitor
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
         ) );
 
+        // This route is called by the monitor page to manually set a door's state
         register_rest_route( $this->namespace, '/monitor/set-door-state', array(
             'methods'             => 'POST',
             'callback'            => array( $this, 'set_door_state_callback' ),
-            'permission_callback' => function ( WP_REST_Request $request ) {
-                // Only admins (the live monitor screen) can change door state.
-                return current_user_can( 'manage_options' );
-            },
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
         ) );
+    }
+
+    /**
+     * Routes used by the live monitor page and the map editor: a logged-in admin, the
+     * same check the monitor shortcode uses. The page's fetch() calls send X-WP-Nonce
+     * (fsbhoa_monitor_vars.nonce), which WordPress needs to recognize the user on REST.
+     */
+    public function monitor_user_permission_check() {
+        return current_user_can( 'manage_options' );
     }
 
     public function is_numeric_callback( $value, $request, $param ) {

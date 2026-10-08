@@ -11,6 +11,7 @@ type Config struct {
     TlsCertPath     string `json:"tls_cert_path"` 
     TlsKeyPath      string `json:"tls_key_path"`  
     WordPressToken  string `json:"wordpress_token,omitempty"` // If you need auth
+    APIKey          string `json:"api_key"` // Access Verification API Key, sent as X-API-KEY to /monitor/event
     EventServiceURL string `json:"event_service_url"`
     PhotoEventLimit int    `json:"photo_event_limit,omitempty"`
 }

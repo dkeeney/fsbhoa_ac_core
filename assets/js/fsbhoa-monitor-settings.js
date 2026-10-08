@@ -39,7 +39,7 @@ jQuery(document).ready(function($) {
     function initializeGateEditor() {
         if (!mapContainer.length) return;
 
-        $.getJSON(GATES_API_URL)
+        $.ajax({ url: GATES_API_URL, dataType: 'json', headers: { 'X-WP-Nonce': fsbhoa_monitor_settings_vars.rest_nonce } })
             .done(function(gates) {
                 mapContainer.find('.gate-marker').remove();
                 legendList.empty();

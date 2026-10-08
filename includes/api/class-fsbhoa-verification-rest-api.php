@@ -23,8 +23,11 @@ class Fsbhoa_Verification_REST_API {
 
     /**
      * Security: callers send the Access Verification API Key (General settings) in X-API-KEY.
+     * This is the one key for every service that calls core's REST API (lighting, the
+     * hardware event services, the monitor service), so other route classes use it too:
+     * 'permission_callback' => [ 'Fsbhoa_Verification_REST_API', 'api_key_permission_check' ].
      */
-    public function api_key_permission_check( WP_REST_Request $request ) {
+    public static function api_key_permission_check( WP_REST_Request $request ) {
         $provided_key = $request->get_header('X-API-KEY');
         
         // Its own key, so it doesn't depend on (or break with) another plugin's key.
