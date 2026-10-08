@@ -158,8 +158,15 @@ class Fsbhoa_Monitor_REST_API {
         }
         $raw_card_number = absint($params['CardNumber'] ?? 0);
 
+        // The event service sends the time it received the event (server local time), so an
+        // event it had to queue while WordPress was down keeps its real time.
+        $event_time = (string) ($params['Timestamp'] ?? '');
+        if ( ! preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $event_time) ) {
+            $event_time = current_time('mysql');
+        }
+
 	    $log_data = [
-		    'event_timestamp'       => $params['Timestamp'] ?? current_time('mysql'),
+		    'event_timestamp'       => $event_time,
 		    'controller_identifier' => $serial,
 		    'door_number'           => $provided_door,
             'rfid_id' => ($raw_card_number === 0) ? 
