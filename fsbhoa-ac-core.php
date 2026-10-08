@@ -223,9 +223,6 @@ function run_fsbhoa_action_handlers() {
     if (class_exists('Fsbhoa_Schedules_Actions')) {
         new Fsbhoa_Schedules_Actions();
     }
-    if (class_exists('Fsbhoa_Schedule_Tasks_Actions')) {
-        new Fsbhoa_Schedule_Tasks_Actions();
-    }
     if (class_exists('Fsbhoa_Schedule_Groups_Actions')) {
         new Fsbhoa_Schedule_Groups_Actions();
     }
