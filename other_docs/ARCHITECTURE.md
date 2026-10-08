@@ -58,6 +58,15 @@ After the refresh:
 
 ### To do before the production release
 
+- **Deployment steps for the 2026-10 testbed work** (until `~/deploy-production.sh` is rewritten; it still calls the deleted `deploy_uhppote.sh`):
+  1. Back up the production database.
+  2. Run `fsbhoa_ac_core/migration.sql`, including steps 7–10 (TEST door role; cardholder statuses; `REGRESSION_TEST` controller type; unsigned door numbers). Step 10 rebuilds `ac_access_log`, which may take a moment.
+  3. Deploy all plugins together. Core and uhppote depend on each other (gate task handler moved, card status column), and the kiosk uses core's key.
+  4. In core General settings, generate the Access Verification API Key and save. Save the Event Service, DoorKing, kiosk and monitor settings so their JSON configs get the key.
+  5. Rebuild and install the event service (`fsbhoa_ac_uhppote/build.sh install`), install the DoorKing proxy and monitor binaries, and restart all the services.
+  6. Check "Enable Scheduled Sync" in the Event Service settings (on for production), restart the event service, and check the crontab requests `wp-cron.php` at 00:11 and 03:11.
+  7. Expect the first DoorKing export to add residents with no photo badge or a disabled one.
+  8. Watch the sync log (`wp-content/debug.log`) for `timed out`, `had issues`, `SYNC FAILED` and `did not answer`, and the Discord channel for sync alerts.
 - **Migration script to set `FSBHOA_AC_ENVIRONMENT` on production.** Production's `wp-config.php` must get `define( 'FSBHOA_AC_ENVIRONMENT', 'production' );` as part of deployment, not by hand.
   - It belongs with the deployment tooling (`~/deploy-production.sh` or this core plugin).
   - It must be idempotent: add the constant only if it's missing, and never overwrite an existing value.
