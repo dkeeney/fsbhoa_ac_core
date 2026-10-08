@@ -263,4 +263,15 @@ ALTER TABLE `ac_controllers`
   MODIFY COLUMN `type` enum('UHPPOTE','VIRTUAL_KIOSK','REGRESSION_TEST') NOT NULL DEFAULT 'UHPPOTE' COMMENT 'Defines the functional class of the device. REGRESSION_TEST = fake controller 88888888 for automated tests (never synced).';
 UPDATE `ac_controllers` SET `type` = 'REGRESSION_TEST' WHERE `uhppoted_device_id` = 88888888;
 
+-- ==============================================================================
+-- STEP 10: Door numbers are unsigned (0-255)
+-- ==============================================================================
+-- Signed tinyint stopped at 127, so the Regression Test System Door (254) was stored, and its
+-- events logged, as 127. No real door is numbered 127, so every 127 is a clamped 254.
+ALTER TABLE `ac_doors`      MODIFY COLUMN `door_number_on_controller` tinyint(3) unsigned NOT NULL COMMENT 'Typically 1-4, representing the door output on the controller board.';
+ALTER TABLE `ac_access_log` MODIFY COLUMN `door_number` tinyint(3) unsigned NOT NULL;
+ALTER TABLE `ac_task_list`  MODIFY COLUMN `door_number` tinyint(3) unsigned DEFAULT NULL COMMENT '1-4, or NULL for all doors on the targeted controller(s)';
+UPDATE `ac_doors`      SET `door_number_on_controller` = 254 WHERE `door_number_on_controller` = 127;
+UPDATE `ac_access_log` SET `door_number` = 254 WHERE `door_number` = 127;
+
 SET FOREIGN_KEY_CHECKS = 1;
