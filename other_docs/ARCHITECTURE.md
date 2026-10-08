@@ -35,10 +35,26 @@ Cron hooks `fsbhoa_run_nightly_rebuild` and `fsbhoa_run_daily_time_sync` are **h
 The testbed (`testbed.fsbhoa.com`) and production share infrastructure such as the NAS and outside services. A testbed test must never reach production hardware or systems, and vice versa.
 
 - **`FSBHOA_AC_ENVIRONMENT`** is defined in each server's `wp-config.php` as `'testbed'` or `'production'`. It is deliberately **not** a WordPress option, so it stays with the server and never travels with a database copy.
-- All other settings stay in the FSBHOA AC dashboard settings (WordPress options). This is safe because refreshing the testbed copies only the `ac_*` tables from production, never `wp_options`.
+- All other settings stay in the FSBHOA AC dashboard settings (WordPress options). This is safe because refreshing the testbed copies only `ac_*` tables from production, never `wp_options` or any other `wp_*` table.
+- Controller addresses (shared 192.168.42.x subnet): **testbed** .53 and .54; **production** .50, .51, .52 and .55.
 - Any code that could affect real hardware, shared folders, or outside systems must check the environment first and **fail closed**: if the constant is missing or unrecognized, do nothing and log why.
 - Anything sent to another system (files, API payloads) should say which environment and host it came from, so the receiver can check it or keep the two apart.
 - Implemented so far: `fsbhoa_ac_doorking` (RAM sync and vendor-code rotation). See that repo's `CLAUDE.md`.
+
+### Refreshing the testbed from production
+
+Copy the `ac_*` tables **except** these, which describe production's hardware and must stay as the testbed has them:
+
+- `ac_controllers`
+- `ac_doors`
+- `ac_task_list`
+- `ac_group_permissions`
+
+Copying them would point testbed syncs at production's controllers. `uhppote-cli` finds a controller by its serial number and falls back to broadcast, so a production serial in the testbed database reaches the production controller.
+
+After the refresh:
+- **Check the testbed's group permissions and tasks.** `ac_group_permissions` refers to `ac_groups` and `ac_schedules`, and `ac_task_list` to `ac_schedules`. Those two are copied from production (cardholder memberships need production's group IDs), so the kept rows may now point at the wrong group or schedule, or at none. Re-create them where needed.
+- **Expect unknown doors in testbed reports.** Copied `ac_access_log` rows name production controllers.
 
 ### To do before the production release
 
