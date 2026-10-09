@@ -340,26 +340,6 @@ CREATE TABLE `ac_vehicles` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- --------------------------------------------------------
-
---
--- Table structure for table `ac_vehicle_log`
---
-
-CREATE TABLE `ac_vehicle_log` (
-  `vehicle_log_id` int(11) NOT NULL,
-  `event_timestamp` datetime(3) NOT NULL,
-  `gate_identifier` varchar(50) NOT NULL,
-  `auth_id` varchar(50) DEFAULT NULL,
-  `lpr_plate_string` varchar(20) DEFAULT NULL,
-  `lpr_confidence` tinyint(3) UNSIGNED DEFAULT NULL,
-  `context_image_data` mediumblob DEFAULT NULL,
-  `lpr_image_data` mediumblob DEFAULT NULL,
-  `raw_details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`raw_details`)),
-  `created_at` datetime DEFAULT current_timestamp(),
-  `is_circumvention` tinyint(1) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
-
 --
 -- Indexes for dumped tables
 --
@@ -513,16 +493,6 @@ ALTER TABLE `ac_vehicles`
   ADD KEY `idx_vehicle_household` (`household_id`);
 
 --
--- Indexes for table `ac_vehicle_log`
---
-ALTER TABLE `ac_vehicle_log`
-  ADD PRIMARY KEY (`vehicle_log_id`),
-  ADD KEY `idx_timestamp_gate` (`event_timestamp`,`gate_identifier`),
-  ADD KEY `idx_lpr_plate` (`lpr_plate_string`),
-  ADD KEY `idx_auth_id` (`auth_id`),
-  ADD KEY `idx_circumvention` (`is_circumvention`,`event_timestamp`);
-
---
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -621,12 +591,6 @@ ALTER TABLE `ac_task_list`
 --
 ALTER TABLE `ac_vehicles`
   MODIFY `vehicle_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `ac_vehicle_log`
---
-ALTER TABLE `ac_vehicle_log`
-  MODIFY `vehicle_log_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables

@@ -86,21 +86,12 @@ function fsbhoa_render_live_monitor_view() {
        <div id="activity-log-section">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; max-width: 1400px; margin: 0 auto;">
 
-                <!-- LEFT: Vehicle Activity -->
-                <div id="vehicle-log-column">
-                    <h2 class="text-xl font-semibold mb-4">Vehicle Gate Traffic</h2>
-                   <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                        <div id="vehicle-log-container" style="height: 36rem; overflow-y: auto;">
-                            <ul id="vehicle-event-list" class="divide-y divide-gray-200">
-                             <li id="vehicle-log-placeholder" class="p-4 text-center text-gray-500">
-                                Waiting for vehicle events...
-                            </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+                <?php
+                // Extension plugins add their own activity columns here, left of the pedestrian log.
+                do_action( 'fsbhoa_monitor_activity_columns' );
+                ?>
 
-                <!-- RIGHT: Pedestrian Activity -->
+                <!-- Pedestrian Activity -->
                 <div id="pedestrian-log-column">
                     <h2 class="text-xl font-semibold mb-4">Pedestrian Gate Access</h2>
                     <div class="bg-white rounded-xl shadow-md overflow-hidden">
@@ -118,20 +109,15 @@ function fsbhoa_render_live_monitor_view() {
         </div>
 
 
-        <!-- Lightbox Modal for Full Scene Image -->
-        <div id="fsbhoa-vehicle-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 20px;" onclick="this.style.display='none';">
-            <div style="max-width: 90vw; max-height: 90vh; text-align: center;" onclick="event.stopPropagation();">
-                <img id="fsbhoa-modal-img" src="" alt="Full Scene" style="max-width: 100%; max-height: 80vh; border-radius: 8px;">
-                <div style="margin-top: 10px;">
-                     <button type="button" class="button" onclick="document.getElementById('fsbhoa-vehicle-modal').style.display='none';">Close</button>
-                </div>
-            </div>
-        </div>
         <!-- Lightbox Modal for Cardholder Summary Card -->
         <div id="fsbhoa-cardholder-modal" class="fsbhoa-modal-overlay" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 99999; justify-content: center; align-items: center; padding: 20px; overflow-y: auto;" onclick="if(event.target === this) this.style.display='none';">
             <div id="fsbhoa-cardholder-modal-content" style="max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; border-radius: 8px;" onclick="event.stopPropagation();">
                 <!-- Rendered summary card is dynamically injected here -->
             </div>
         </div>
+        <?php
+        // Extension plugins add their own overlays (lightboxes, dialogs) here.
+        do_action( 'fsbhoa_monitor_modals' );
+        ?>
     <?php
 }

@@ -560,14 +560,11 @@ document.addEventListener('DOMContentLoaded', function () {
             showCardholderSummaryModal(cardholderId);
         };
 
-        const pedList = document.getElementById('event-list');
-        if (pedList) {
-            pedList.addEventListener('click', handleLogClick);
-        }
-
-        const vehList = document.getElementById('vehicle-event-list');
-        if (vehList) {
-            vehList.addEventListener('click', handleLogClick);
+        // One listener for every activity column, including columns added by extension
+        // plugins (fsbhoa_monitor_activity_columns): any li with data-cardholder-id opens the card.
+        const activitySection = document.getElementById('activity-log-section');
+        if (activitySection) {
+            activitySection.addEventListener('click', handleLogClick);
         }
     }
 
