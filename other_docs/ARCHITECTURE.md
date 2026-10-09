@@ -41,7 +41,7 @@ The testbed (`testbed.fsbhoa.com`) and production share infrastructure such as t
 - Any code that could affect real hardware, shared folders, or outside systems must check the environment first and **fail closed**: if the constant is missing or unrecognized, do nothing and log why.
 - The rule is that the testbed must not *affect* production. Read-only use of production hardware is allowed when duplicating it isn't practical, as long as reading can't change how production behaves. Example: the testbed reads the production LPR cameras (see `fsbhoa_ac_vehicle`'s `CLAUDE.md`).
 - Anything sent to another system (files, API payloads) should say which environment and host it came from, so the receiver can check it or keep the two apart.
-- Implemented so far: `fsbhoa_ac_doorking` (RAM sync and vendor-code rotation). See that repo's `CLAUDE.md`.
+- Implemented so far: `fsbhoa_ac_doorking` (RAM sync and vendor-code rotation) and `fsbhoa_ac_vehicle` (vehicle_service posts only to its own server's WordPress, and vehicle events must match the server's environment). See each repo's `CLAUDE.md`.
 
 ### Refreshing the testbed from production
 
