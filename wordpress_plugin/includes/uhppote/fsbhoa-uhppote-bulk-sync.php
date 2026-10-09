@@ -7,6 +7,9 @@ if ( ! defined( 'WPINC' ) ) { die; }
  */
 class Fsbhoa_Uhppote_Bulk_Sync {
 
+    // Maximum time for a single load-acl attempt before it is killed and retried.
+    const LOAD_ACL_TIMEOUT_SECONDS = 180;
+
     /**
      * Executes the bulk load-acl process for a single controller.
      */
@@ -92,8 +95,15 @@ class Fsbhoa_Uhppote_Bulk_Sync {
         $headers = array_merge(['Card Number', 'From', 'To'], $door_headers);
         fputcsv($tsv_handle, $headers, "\t", '"', '\\');
 
-        // Write Card Rows
-        foreach ($cardholders_to_sync as $cardholder) {
+        // Write Card Rows in ascending card-number order.
+        // The controller looks cards up with a binary search over a sorted table,
+        // so we always feed it sorted data.
+        $sorted_cardholders = $cardholders_to_sync;
+        usort($sorted_cardholders, function($a, $b) {
+            return (int)$a->rfid_id <=> (int)$b->rfid_id;
+        });
+
+        foreach ($sorted_cardholders as $cardholder) {
             $rfid = $cardholder->rfid_id;
             if (empty($rfid)) continue;
 
@@ -114,9 +124,13 @@ class Fsbhoa_Uhppote_Bulk_Sync {
 
         // 4. Execute the Bulk Upload
         // We pass the explicit config file and strict mode
+        // Each attempt is capped with `timeout` so a hung controller cannot stall
+        // the whole sync. A normal load takes 5-70s (North Gate is the slowest).
+        // The exit status is appended so a timeout (exit 124) can be logged clearly.
         $bulk_command = sprintf(
-            'uhppote-cli --config %s load-acl %s 2>&1', 
-            escapeshellarg($conf_path), 
+            'timeout %d uhppote-cli --config %s load-acl %s 2>&1; echo "[exit=$?]"',
+            self::LOAD_ACL_TIMEOUT_SECONDS,
+            escapeshellarg($conf_path),
             escapeshellarg($tsv_path)
         );
         
@@ -127,12 +141,35 @@ class Fsbhoa_Uhppote_Bulk_Sync {
             error_log("SYNC SERVICE: Running bulk load-acl for {$device_id}...");
 
             // The Self-Healing Retry Loop (Attempts up to 3 times)
+            // NOTE: load-acl appends newly added cards to the END of the controller's
+            // card table. That leaves the table unsorted and the controller's binary
+            // search then fails for a block of cards (they swipe as "No Permissions").
+            // Any retry, or any delta that adds/deletes cards, must therefore be done
+            // as delete-all + full load-acl so the table is rebuilt in sorted order.
+            $needs_wipe = false;
+            $wiped_this_run = false;
             for ($attempt = 1; $attempt <= 3; $attempt++) {
+                if ($needs_wipe) {
+                    $this->wipe_controller_cards($device_id);
+                    $wiped_this_run = true;
+                    $needs_wipe = false;
+                }
+
                 error_log("SYNC SERVICE: Executing bulk load-acl (Attempt {$attempt}/3) for {$device_id}...");
                 $output = shell_exec($bulk_command);
 
                 // Catch dropped packets, hung controllers, empty output, or memory corruption
+                if (strpos((string)$output, '[exit=124]') !== false) {
+                    error_log("SYNC TIMEOUT: load-acl for {$device_id} exceeded " . self::LOAD_ACL_TIMEOUT_SECONDS . "s and was terminated.");
+                }
+
+                // A load only counts as complete if load-acl printed its final summary line.
+                // Without this, an interrupted run (killed, timed out, crashed) has no error
+                // markers and was previously logged as SYNC SUCCESS.
+                $has_summary = preg_match('/unchanged:\s*\d+\s+updated:\s*\d+\s+added:\s*\d+\s+deleted:\s*\d+\s+failed:\s*\d+\s+errors:\s*\d+/', (string)$output);
+
                 $has_error = empty($output)
+                    || !$has_summary
                     || strpos($output, 'ERROR') !== false
                     || preg_match('/failed:\s*[1-9]/', $output)
                     || preg_match('/errors:\s*[1-9]/', $output)
@@ -146,31 +183,35 @@ class Fsbhoa_Uhppote_Bulk_Sync {
                     if ($attempt < 3) {
                         // RECOVERY ONLY: Attempt 1 failed. Protect NVRAM by only clearing on retry (attempts 2 & 3).
                         error_log("SYNC RECOVERY: load-acl failed. Wiping controller {$device_id} memory before attempt " . ($attempt + 1) . "...");
-
-                        // Explicit IP prevents broadcast packet drops if controller network stack is unresponsive
-                        $dest_arg = !empty($controller_ip) ? sprintf('--dest %s:60000 ', escapeshellarg($controller_ip)) : '';
-                        $wipe_cmd = sprintf('uhppote-cli %sdelete-all %s 2>&1', $dest_arg, escapeshellarg($device_id));
-
-                        $wipe_out = shell_exec($wipe_cmd);
-                        $clean_wipe = trim(preg_replace('/\s+/', ' ', (string)$wipe_out));
-                        error_log("SYNC RECOVERY: delete-all output for {$device_id}: {$clean_wipe}");
-
-                        // Settle delay for SPI flash sector erase
-                        error_log("SYNC RECOVERY: Pausing 4 seconds for controller flash erase to settle...");
-                        sleep(4);
-
-                        continue; // Loop back and retry load-acl
+                        $needs_wipe = true;
+                        continue; // Loop back, wipe, and retry load-acl
                     } else {
                         error_log("SYNC FATAL (BULK ACL): Failed after 3 attempts for {$device_id}.");
                         $success = false;
                         break;
                     }
-                } else {
-                    $clean_output = trim(preg_replace('/\s+/', ' ', (string)$output));
-                    error_log("SYNC SUCCESS: Bulk ACL for {$device_id} - {$clean_output}");
-                    $success = true;
-                    break; // Succeeded! Break out of the retry loop.
                 }
+
+                $clean_output = trim(preg_replace('/\s+/', ' ', (string)$output));
+
+                // Did this load insert/remove cards in a table that already had cards?
+                // If so the new cards were appended out of order -> rebuild the table.
+                if (!$wiped_this_run && $attempt < 3
+                    && preg_match('/unchanged:\s*(\d+).*?added:\s*(\d+)\s+deleted:\s*(\d+)/', $output, $counts)) {
+                    $unchanged = (int)$counts[1];
+                    $added     = (int)$counts[2];
+                    $deleted   = (int)$counts[3];
+
+                    if ($unchanged > 0 && ($added > 0 || $deleted > 0)) {
+                        error_log("SYNC RESORT: load-acl for {$device_id} added {$added} / deleted {$deleted} cards in a populated table ({$clean_output}). Wiping and reloading to keep the card table sorted...");
+                        $needs_wipe = true;
+                        continue; // Loop back, wipe, and reload in sorted order
+                    }
+                }
+
+                error_log("SYNC SUCCESS: Bulk ACL for {$device_id} - {$clean_output}");
+                $success = true;
+                break; // Succeeded! Break out of the retry loop.
             }
 
             unlink($conf_path);
@@ -178,6 +219,28 @@ class Fsbhoa_Uhppote_Bulk_Sync {
         }
 
         return $success;
+    }
+
+    /**
+     * Clears all cards from a controller so the next load-acl rebuilds
+     * the card table from scratch in sorted order.
+     * Uses the controller addresses in /etc/uhppoted/uhppoted.conf
+     * (uhppote-cli v0.8.12 has no --dest option).
+     */
+    private function wipe_controller_cards($device_id) {
+        $wipe_cmd = sprintf('uhppote-cli delete-all %s 2>&1', escapeshellarg($device_id));
+
+        $wipe_out = shell_exec($wipe_cmd);
+        $clean_wipe = trim(preg_replace('/\s+/', ' ', (string)$wipe_out));
+        if (empty($clean_wipe) || strpos($clean_wipe, 'ERROR') !== false) {
+            error_log("SYNC RECOVERY WARNING: delete-all for {$device_id} may have failed: {$clean_wipe}");
+        } else {
+            error_log("SYNC RECOVERY: delete-all output for {$device_id}: {$clean_wipe}");
+        }
+
+        // Settle delay for SPI flash sector erase
+        error_log("SYNC RECOVERY: Pausing 4 seconds for controller flash erase to settle...");
+        sleep(4);
     }
 
     /**
