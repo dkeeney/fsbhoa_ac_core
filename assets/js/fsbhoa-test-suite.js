@@ -127,12 +127,17 @@ jQuery(document).ready(function($) {
             const $btn = $(this);
             const resultsDiv = $('#test-results');
     
+            // Optional: one controller whose cards are also looked up by number (about 2 minutes)
+            const lookupDevice = $('#hardware-audit-lookup').val() || '';
+
             $btn.prop('disabled', true).text('Auditing Controllers...');
-            resultsDiv.html('<div style="color:#333; margin-bottom:5px;"><i>Starting Hardware Audit across all controllers...</i></div>');
+            resultsDiv.html('<div style="color:#333; margin-bottom:5px;"><i>Starting Hardware Audit across all controllers'
+                + (lookupDevice ? ', looking up every card on ' + lookupDevice + ' (about 2 minutes)' : '') + '...</i></div>');
 
             $.post(fsbhoa_test_vars.ajax_url, {
                 action: 'fsbhoa_run_hardware_audit',
-                nonce: fsbhoa_test_vars.nonce
+                nonce: fsbhoa_test_vars.nonce,
+                lookup_device: lookupDevice
             })
             .done(function(response) {
                 if (!response.success) {
@@ -143,14 +148,63 @@ jQuery(document).ready(function($) {
                 resultsDiv.empty();
                 resultsDiv.append('<div style="color:#333; font-weight:bold; margin-bottom:10px;">=== UHPPOTE CONTROLLER AUDIT REPORT ===</div>');
 
-                response.data.forEach(function(report) {
-                    logResult('[' + report.status + '] ' + report.name + ' (' + report.device_id + ') - ' + report.doors_configured + ' Door(s)');
-                    logResult('  Cards DB: ' + report.total_db + ' | Cards HW: ' + report.total_hw);
-    
-                    if (report.missing_from_hw > 0 || report.unexpected_on_hw > 0) {
-                        logResult('  Missing from Board: ' + report.missing_from_hw + ' | Unexpected on Board: ' + report.unexpected_on_hw);
+                (response.data.notes || []).forEach(function(note) {
+                    logResult('Note: ' + note);
+                });
+
+                // Lists "card: details" lines from an object, or card numbers from an array
+                const logList = function(label, items) {
+                    if (Array.isArray(items)) {
+                        if (items.length > 0) logResult('      ' + label + ': ' + items.join(', '));
+                    } else {
+                        $.each(items || {}, function(card, details) {
+                            logResult('      ' + card + ': ' + details);
+                        });
                     }
-    
+                };
+
+                response.data.reports.forEach(function(report) {
+                    logResult('[' + report.status + '] ' + report.name + ' (' + report.device_id + ') - ' + report.doors_configured + ' Door(s)',
+                        report.status === 'OK' ? 'success' : 'error');
+                    logResult('  Cards DB: ' + report.total_db + ' | Cards HW: ' + report.total_hw);
+
+                    if (report.missing_from_hw > 0 || report.unexpected_on_hw > 0) {
+                        logResult('  Missing from Board: ' + report.missing_from_hw + ' | Unexpected on Board: ' + report.unexpected_on_hw, 'error');
+                        logList('Missing', report.missing_sample);
+                        logList('Unexpected', report.unexpected_sample);
+                    }
+
+                    // Cards that are on the board but hold different dates or door settings than the compiler expects
+                    if (report.card_mismatch_count > 0) {
+                        logResult('  [!] Cards with wrong dates or door settings: ' + report.card_mismatch_count, 'error');
+                        logList('', report.card_mismatch_sample);
+                    } else {
+                        logResult('  Every card on the board has the dates and door settings the compiler expects.');
+                    }
+
+                    // Time profiles whose days or times differ from the compiler's
+                    if (Object.keys(report.profile_mismatches || {}).length > 0) {
+                        logResult('  [!] Time profiles that differ from the compiler:', 'error');
+                        $.each(report.profile_mismatches, function(pid, expected) {
+                            logResult('      Profile ' + pid + ': ' + expected);
+                        });
+                    }
+
+                    // Each card looked up by number, as at a swipe
+                    if (report.lookup) {
+                        const lk = report.lookup;
+                        const bad = lk.not_found_count + lk.wrong_count + lk.unreadable_count;
+                        logResult('  Looked up ' + lk.checked + ' cards by number: ' + (bad === 0 ? 'all found and correct.' :
+                            lk.not_found_count + ' not found, ' + lk.wrong_count + ' wrong, ' + lk.unreadable_count + ' unreadable replies.'),
+                            bad === 0 ? 'success' : 'error');
+                        if (lk.not_found_count > 0) {
+                            logResult('      Not found cards are stored out of order: their swipes are denied. Run Force Full Rebuild.', 'error');
+                        }
+                        logList('Not found', lk.not_found);
+                        logList('', lk.wrong);
+                        logList('Unreadable', lk.unreadable);
+                    }
+
                     logResult('  Unassigned (No access): ' + report.unassigned_count + ' cards');
     
                     // Report malformed profile values (0, 1, blanks)
