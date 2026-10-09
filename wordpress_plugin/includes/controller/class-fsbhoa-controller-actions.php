@@ -355,6 +355,7 @@ class Fsbhoa_Controller_Actions {
         $query = "
             SELECT
                 c.uhppoted_device_id,
+                c.ip_address,
                 c.door_count,
                 d.door_record_id,
                 d.door_number_on_controller,
@@ -380,8 +381,13 @@ class Fsbhoa_Controller_Actions {
             $controller_sn = $row['uhppoted_device_id'];
 
             if (!isset($structured_data[$controller_sn])) {
+                $raw_ip = trim($row['ip_address'] ?? '');
+                if (!empty($raw_ip) && strpos($raw_ip, ':') === false) {
+                    $raw_ip .= ':60000';
+                }
                 $structured_data[$controller_sn] = [
                     'controller_sn' => (int)$controller_sn,
+                    'ip_address'    => $raw_ip,
                     'door_count'    => (int)$row['door_count'],
                     'doors'         => [],
                 ];

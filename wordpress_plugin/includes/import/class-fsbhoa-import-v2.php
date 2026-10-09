@@ -460,6 +460,11 @@ private function parse_cardholders_from_row($row)
             $clean_address = trim($clean_address);
         }
 
+        // --- NEW: Standardize to USPS abbreviations before parsing ---
+        if (function_exists('fsbhoa_standardize_address')) {
+            $clean_address = fsbhoa_standardize_address($clean_address);
+        }
+
         if (empty($clean_address)) {
             return null; // Address was just the suffix, so it's empty
         }
@@ -469,9 +474,16 @@ private function parse_cardholders_from_row($row)
             throw new Exception("Could not parse address '{$clean_address}'. It must start with a house number.");
         }
         $house_number = trim($matches[1]);
-        $street_name = trim($matches[2]);
-error_log("[IMPORT DEBUG] Searching for property with House Number: '{$house_number}' and Street Name: '{$street_name}'");
-        // 3. Check if property exists based on the new split fields
+        $street_name  = trim($matches[2]);
+
+        // Standardize street_name component as well (e.g. "Copenhagen Place" -> "Copenhagen Pl")
+        if (function_exists('fsbhoa_standardize_address')) {
+            $street_name = fsbhoa_standardize_address($street_name);
+        }
+
+        error_log("[IMPORT DEBUG] Searching for property with House Number: '{$house_number}' and Street Name: '{$street_name}'");
+
+        // 3. Check if property exists based on the split fields
         $query = $this->wpdb->prepare(
             "SELECT property_id, origin FROM {$this->table_properties} WHERE house_number = %s AND street_name = %s",
             $house_number,

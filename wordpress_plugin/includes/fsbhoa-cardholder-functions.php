@@ -81,3 +81,84 @@ function get_cardholder_group_memberships($cardholder_id) {
 }
 
 
+/**
+ * Standardizes a street address to USPS preferred abbreviations and Title Case.
+ * Strips punctuation and normalizes common street/unit suffixes.
+ *
+ * @param string $address The raw address string.
+ * @return string The standardized Title Case address.
+ */
+function fsbhoa_standardize_address( $address ) {
+    if ( empty( $address ) ) {
+        return '';
+    }
+
+    // 1. Convert to lowercase for uniform matching
+    $address = strtolower( trim( $address ) );
+
+    // 2. Strip periods and commas (USPS prefers no punctuation)
+    $address = preg_replace( '/[.,]/', '', $address );
+
+    // 3. Define dictionary mapping using regex word boundaries (\b)
+    $replacements = [
+        // Street Suffixes
+        '\bavenue\b'    => 'ave',
+        '\bboulevard\b' => 'blvd',
+        '\bcircle\b'    => 'cir',
+        '\bcourt\b'     => 'ct',
+        '\bdrive\b'     => 'dr',
+        '\blane\b'      => 'ln',
+        '\bplace\b'     => 'pl',
+        '\broad\b'      => 'rd',
+        '\bstreet\b'    => 'st',
+        '\bparkway\b'   => 'pkwy',
+        '\bhighway\b'   => 'hwy',
+        '\bsquare\b'    => 'sq',
+        '\bterrace\b'   => 'ter',
+        '\btrail\b'     => 'trl',
+
+        // Catch common non-standard abbreviations
+        '\bav\b'        => 'ave',
+        '\bstr\b'       => 'st',
+        '\bblv\b'       => 'blvd',
+
+        // Directionals
+        '\bnorth\b'     => 'n',
+        '\bsouth\b'     => 's',
+        '\beast\b'      => 'e',
+        '\bwest\b'      => 'w',
+        '\bnortheast\b' => 'ne',
+        '\bnorthwest\b' => 'nw',
+        '\bsoutheast\b' => 'se',
+        '\bsouthwest\b' => 'sw',
+
+        // Secondary Units
+        '\bapartment\b' => 'apt',
+        '\bsuite\b'     => 'ste',
+        '\bbuilding\b'  => 'bldg',
+        '\broom\b'      => 'rm',
+        '\bdepartment\b'=> 'dept',
+        '\bfloor\b'     => 'fl'
+    ];
+
+    // 4. Apply the dictionary replacements
+    foreach ( $replacements as $pattern => $replacement ) {
+        $address = preg_replace( '/' . $pattern . '/', $replacement, $address );
+    }
+
+    // 5. Convert to Title Case
+    $address = ucwords( $address );
+
+    // 6. Fix specific Title Case anomalies (e.g., ucwords makes "Ne" instead of "NE")
+    $address = preg_replace( '/\bNe\b/', 'NE', $address );
+    $address = preg_replace( '/\bNw\b/', 'NW', $address );
+    $address = preg_replace( '/\bSe\b/', 'SE', $address );
+    $address = preg_replace( '/\bSw\b/', 'SW', $address );
+    $address = preg_replace( '/\bPo Box\b/', 'PO Box', $address );
+
+    // 7. Strip out accidental double spaces
+    $address = preg_replace( '/\s+/', ' ', $address );
+
+    return trim( $address );
+}
+

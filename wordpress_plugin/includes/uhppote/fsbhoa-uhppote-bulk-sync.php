@@ -128,26 +128,45 @@ class Fsbhoa_Uhppote_Bulk_Sync {
 
             // The Self-Healing Retry Loop (Attempts up to 3 times)
             for ($attempt = 1; $attempt <= 3; $attempt++) {
+                error_log("SYNC SERVICE: Executing bulk load-acl (Attempt {$attempt}/3) for {$device_id}...");
                 $output = shell_exec($bulk_command);
 
-                if (strpos($output, 'ERROR') !== false
-                    || preg_match('/failed:[1-9]/', $output)
-                    || preg_match('/errors:[1-9]/', $output)) {
+                // Catch dropped packets, hung controllers, empty output, or memory corruption
+                $has_error = empty($output)
+                    || strpos($output, 'ERROR') !== false
+                    || preg_match('/failed:\s*[1-9]/', $output)
+                    || preg_match('/errors:\s*[1-9]/', $output)
+                    || strpos($output, 'invalid BCD') !== false
+                    || strpos($output, 'invalid MsgType') !== false;
 
-                    $clean_output = trim(preg_replace('/\s+/', ' ', $output));
-                    error_log("SYNC WARNING: Bulk ACL attempt $attempt for {$device_id} had dropped packets: {$clean_output}");
+                if ($has_error) {
+                    $clean_output = trim(preg_replace('/\s+/', ' ', (string)$output));
+                    error_log("SYNC WARNING: Bulk ACL attempt {$attempt}/3 for {$device_id} had issues: {$clean_output}");
 
                     if ($attempt < 3) {
-                        error_log("SYNC SERVICE: Retrying Delta push for {$device_id} in 3 seconds...");
-                        sleep(3); // Wait for the network to clear its throat
-                        continue; // Loop back and try again
+                        // RECOVERY ONLY: Attempt 1 failed. Protect NVRAM by only clearing on retry (attempts 2 & 3).
+                        error_log("SYNC RECOVERY: load-acl failed. Wiping controller {$device_id} memory before attempt " . ($attempt + 1) . "...");
+
+                        // Explicit IP prevents broadcast packet drops if controller network stack is unresponsive
+                        $dest_arg = !empty($controller_ip) ? sprintf('--dest %s:60000 ', escapeshellarg($controller_ip)) : '';
+                        $wipe_cmd = sprintf('uhppote-cli %sdelete-all %s 2>&1', $dest_arg, escapeshellarg($device_id));
+
+                        $wipe_out = shell_exec($wipe_cmd);
+                        $clean_wipe = trim(preg_replace('/\s+/', ' ', (string)$wipe_out));
+                        error_log("SYNC RECOVERY: delete-all output for {$device_id}: {$clean_wipe}");
+
+                        // Settle delay for SPI flash sector erase
+                        error_log("SYNC RECOVERY: Pausing 4 seconds for controller flash erase to settle...");
+                        sleep(4);
+
+                        continue; // Loop back and retry load-acl
                     } else {
                         error_log("SYNC FATAL (BULK ACL): Failed after 3 attempts for {$device_id}.");
                         $success = false;
                         break;
                     }
                 } else {
-                    $clean_output = trim(preg_replace('/\s+/', ' ', $output));
+                    $clean_output = trim(preg_replace('/\s+/', ' ', (string)$output));
                     error_log("SYNC SUCCESS: Bulk ACL for {$device_id} - {$clean_output}");
                     $success = true;
                     break; // Succeeded! Break out of the retry loop.

@@ -1,37 +1,38 @@
 package main
 
 import (
-    "time"
+	"time"
 )
 
 // Config holds all configuration loaded from the event_service.conf file
 type Config struct {
-	BindAddress      string `json:"bindAddress"`
-	BroadcastAddress string `json:"broadcastAddress"`
-	ListenPort       int    `json:"listenPort"`
-	CallbackHost     string `json:"callbackHost"`
-	WebSocketPort    int    `json:"webSocketPort"`
-	WpURL            string `json:"wpURL"`
-	TlsCert          string `json:"tlsCert"`
-	TlsKey           string `json:"tlsKey"`
-	LogFile          string `json:"logFile"`
-	Debug            bool   `json:"debug"`
-	EnableTestStub   bool   `json:"enableTestStub"`
-    MonitorServiceURL   string `json:"monitorServiceURL"`
+	BindAddress       string `json:"bindAddress"`
+	BroadcastAddress  string `json:"broadcastAddress"`
+	ListenPort        int    `json:"listenPort"`
+	CallbackHost      string `json:"callbackHost"`
+	WebSocketPort     int    `json:"webSocketPort"`
+	WpURL             string `json:"wpURL"`
+	TlsCert           string `json:"tlsCert"`
+	TlsKey            string `json:"tlsKey"`
+	LogFile           string `json:"logFile"`
+	Debug             bool   `json:"debug"`
+	EnableTestStub    bool   `json:"enableTestStub"`
+	MonitorServiceURL string `json:"monitorServiceURL"`
 }
 
 // DoorConfig matches a single door object within the new config file.
 type DoorConfig struct {
-	ID         int    `json:"door_id"`
-	Number     uint8  `json:"door_number"`
-	Name       string `json:"name"`
-	MapX       int    `json:"map_x"`
-	MapY       int    `json:"map_y"`
+	ID     int    `json:"door_id"`
+	Number uint8  `json:"door_number"`
+	Name   string `json:"name"`
+	MapX   int    `json:"map_x"`
+	MapY   int    `json:"map_y"`
 }
 
 // ControllerConfig matches a single controller object within the new config file.
 type ControllerConfig struct {
 	SN        uint32       `json:"controller_sn"`
+	IPAddress string       `json:"ip_address"`
 	DoorCount uint8        `json:"door_count"`
 	Doors     []DoorConfig `json:"doors"`
 }
@@ -52,7 +53,7 @@ type AccessEventPayload struct {
 	EventMessage   string `json:"eventMessage"`
 	CardNumber     uint32 `json:"cardNumber"`
 	DoorRecordID   int    `json:"doorRecordId"`
-    StreetAddress  string `json:"streetAddress"`
+	StreetAddress  string `json:"streetAddress"`
 }
 
 // GateStatusPayload is the payload for periodic gate status updates.
@@ -64,7 +65,7 @@ type GateStatusPayload struct {
 // RawHardwareEvent holds the unprocessed event from the controller.
 type RawHardwareEvent struct {
 	SerialNumber uint32
-    Timestamp    time.Time
+	Timestamp    time.Time
 	CardNumber   uint32
 	Door         uint8
 	Granted      bool
@@ -77,8 +78,5 @@ type WordPressEnrichmentData struct {
 	PhotoURL       string `json:"photoURL"`
 	GateName       string `json:"gateName"`
 	DoorRecordID   int    `json:"doorRecordId"`
-    StreetAddress  string `json:"streetAddress"`
+	StreetAddress  string `json:"streetAddress"`
 }
-
-
-

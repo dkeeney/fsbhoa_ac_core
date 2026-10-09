@@ -138,8 +138,7 @@ function fsbhoa_execute_sync_logic($controllers, $permission_data, $cardholders_
             if (!$is_dry_run) {
                 shell_exec(sprintf('uhppote-cli clear-time-profiles %s 2>&1', $device_id));
                 // we are relying on the bulk update to do the job for cards.
-                // shell_exec(sprintf('uhppote-cli delete-all %s 2>&1', $device_id));
-                $wpdb->delete('ac_sync_hashes', ['device_id' => $device_id]);   // clear only one controller.
+                shell_exec(sprintf('uhppote-cli delete-all %s 2>&1', $device_id));
                 sleep(1);
             } else {
                 error_log("DRY RUN: Would execute clear-time-profiles and delete-cards on " . $device_id);
