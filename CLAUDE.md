@@ -6,7 +6,7 @@
 - V2 is being developed separately on **testbed.fsbhoa.com** — experimental work belongs there, not here.
 - **Do not change code, the database, controller state, or services without coordinating with David first.** Read-only investigation (reading code/logs, `SELECT` queries, `uhppote-cli get-*` commands) is fine.
 - **The WordPress plugin is LIVE from this git checkout**: `/var/www/html/wp-content/plugins/fsbhoa-access-control` is a symlink to `/home/fsbhoa/fsbhoa_ac/wordpress_plugin`. Any edit to a PHP file takes effect immediately for the next request / cron run. Uncommitted changes in the working tree are running in production.
-- **Git remote hazard:** `origin` is `github.com:dkeeney/fsbhoa_ac`, but that repo was renamed to `fsbhoa_ac_core` for V2 and GitHub redirects the old name. Its `main` is now V2 code. **Never `git pull`/`fetch`+merge/`push` here** — a pull would deploy V2 into production (the plugin is live from this checkout). A separate home for V1 is still to be set up.
+- **Git: V1 lives on the `v1-production` branch** of `github.com:dkeeney/fsbhoa_ac_core` (the old `fsbhoa_ac` repo was renamed for V2). That repo's `main` is **V2 code** — never merge, pull, or check out `main` here, and never merge `v1-production` into `main`: the plugin is live from this checkout, so V2 code here would deploy it to production. `origin` is configured to fetch and push only `v1-production`; keep it that way. V2 split from V1 at commit `2261e18`.
 - Never run commands that write to the controllers (`delete-all`, `put-card`, `load-acl`, `set-*`, `clear-*`, `restore-default-parameters`, `open`, …) unless David explicitly asks for that specific command.
 
 ## Architecture
