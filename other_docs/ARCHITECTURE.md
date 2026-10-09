@@ -18,6 +18,7 @@ All repos live in `/home/pi/` and are symlinked into `/var/www/html/wp-content/p
 Rules (from `fsbhoa_ac_core/fsbhoa-ac-core.php`):
 1. **Core must never reference any extension plugin** — no class names, no hardware specifics.
 2. Extensions may depend on core.
+3. **Extensions must never depend on another extension plugin.** Each extension is self-contained and relies only on core. If two extensions need the same thing, put it in core (or a core hook); otherwise each extension handles it itself. For example, `fsbhoa_ac_vehicle` can't get the DoorKing live event feed through `fsbhoa_ac_doorking`, so it may receive the feed directly.
 
 Core exposes extension points via WordPress hooks; extensions implement them. When an extension needs new behavior from core, add a `do_action`/`apply_filters` hook to core rather than having core call plugin code. Examples:
 - Lifecycle events: `fsbhoa_core_cardholder_created/updated/restored`, `fsbhoa_core_cardholders_merged`, `fsbhoa_core_cardholder_household_changed`, `fsbhoa_core_vehicle_saved/deleted`, `fsbhoa_core_group_saved`, `fsbhoa_core_amenities_changed`, `fsbhoa_pending_change_{type}`
@@ -38,6 +39,7 @@ The testbed (`testbed.fsbhoa.com`) and production share infrastructure such as t
 - All other settings stay in the FSBHOA AC dashboard settings (WordPress options). This is safe because refreshing the testbed copies only `ac_*` tables from production, never `wp_options` or any other `wp_*` table.
 - Controller addresses (shared 192.168.42.x subnet): **testbed** .53 and .54; **production** .50, .51, .52 and .55.
 - Any code that could affect real hardware, shared folders, or outside systems must check the environment first and **fail closed**: if the constant is missing or unrecognized, do nothing and log why.
+- The rule is that the testbed must not *affect* production. Read-only use of production hardware is allowed when duplicating it isn't practical, as long as reading can't change how production behaves. Example: the testbed reads the production LPR cameras (see `fsbhoa_ac_vehicle`'s `CLAUDE.md`).
 - Anything sent to another system (files, API payloads) should say which environment and host it came from, so the receiver can check it or keep the two apart.
 - Implemented so far: `fsbhoa_ac_doorking` (RAM sync and vendor-code rotation). See that repo's `CLAUDE.md`.
 
