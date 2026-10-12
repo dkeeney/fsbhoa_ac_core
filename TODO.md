@@ -14,3 +14,10 @@
 ## Core vs. extension plugins
 
 - [ ] **3. Move the Hardware audit's JavaScript to `fsbhoa_ac_uhppote`.** The click handler for `#run-hardware-audit-btn` (AJAX action `fsbhoa_run_hardware_audit`) is in core's `assets/js/fsbhoa-test-suite.js`, but the button and the handler are uhppote's. Core must not depend on an extension (`other_docs/ARCHITECTURE.md`).
+
+## Schema
+
+- [ ] **4. Make `ac_credentials.expiration_date` a `DATE`, not a `DATETIME`.** Expiry is a calendar date. Storing a time makes every value come back as `2099-12-31 00:00:00`, so code that compares it with `'2099-12-31'` ("never expires") silently fails. `fsbhoa_ac_zebra` hit this and printed "Expires: 12/31/2099" until it was changed to compare only the date part.
+  - Change the column in `db_schema.sql`, the `CREATE TABLE` in `includes/class-fsbhoa-core-repository.php`, and add an `ALTER TABLE ... MODIFY expiration_date DATE DEFAULT NULL` step to `migration.sql`. MySQL drops the time when converting, so existing values like `2099-12-31 23:59:59` (from the old `COALESCE` in `migration.sql`) become `2099-12-31`.
+  - Decide whether a badge is valid *through* its expiry date. Core's access log (`fsbhoa-access-service-functions.php`, `strtotime($cred->expiration_date) < $now`) treats a bare date as midnight at the start of that day, so the badge would count as expired for the whole of its last day. The UHPPOTE controllers treat their end date as inclusive.
+  - Then check the code that reads the column, so nothing relies on the time part: `fsbhoa_ac_uhppote` (credentials, RFID section, permission compiler, bulk sync), `fsbhoa_ac_kiosk` (admin override, REST API), `fsbhoa_ac_doorking` (rotation, vendor importer) and `fsbhoa_ac_zebra` (print actions, badge preview). Most already take `substr(..., 0, 10)` or write a bare date, so the change should be safe, but test the badge edit screen, the permission compile and a print.
