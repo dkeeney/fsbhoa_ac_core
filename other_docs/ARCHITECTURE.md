@@ -80,6 +80,29 @@ After the refresh:
 - **Test `migration.sql` steps 4 and 8 and the import with the new cardholder statuses** (2026-10-08 change: no `inactive` or `disabled` cardholders, badges migrated as `active` or `disabled`). The testbed data was updated by hand, not by running the migration. The first DoorKing export after the migration will add residents without a photo badge, or with a disabled one.
 - Consider a shared helper in core (for example `fsbhoa_ac_environment()`) and showing the environment on the main FSBHOA AC settings page, so extensions stop reading the constant themselves.
 
+### To do: limit each system's access to the NAS
+
+Recorded 2026-10-13; not scheduled yet. The NAS holds the HOA's official records (`Hoa_Data`, `IT_Docs`, `Scans` and more; all but accounting). Parts are copied offsite every day, and all of it to a thumbdrive every night. Every system also backs itself up to its own folder there.
+
+**The problem: each access-control server mounts the whole `shared` share read-write** at `/mnt/shared`, with every file appearing as owned by `www-data`, mode 775. So the WordPress web server, the internet-facing part of the system, and `vehicle_service` (group `www-data`) can change or delete the HOA's records. The amount of automation traffic doesn't matter (a few kilobytes a day); the reach does:
+- **Ransomware or a compromised WordPress** (a plugin flaw, a stolen admin password) encrypts or deletes whatever network shares the machine has mounted. A nightly copy of *changes*, and an overwritten thumbdrive, can then copy the damage over the good copies, unless the offsite storage keeps old versions.
+- **A bug** in a cleanup routine with a wrong path has the same reach.
+- **Sensitive automation files go into the backups:** `To_RAM_*/updates_processed_*.csv` hold every resident's tags and gate codes and are never deleted (`fsbhoa_ac_doorking` TODO #6).
+
+**What this system uses on the NAS** (as of 2026-10-13):
+- `Automation/DoorKing/` (`To_RAM_<Env>`, `Live_<Env>`, `Logs`): the DoorKing export (`Fsbhoa_DoorKing_Export::SYNC_BASE_DIR`), the vehicle plugin's RAM Disk File reader (`FSBHOA_Vehicle_Settings::RAM_FILE_BASE_DIR` and the RAM Stream File setting), and `DK_Sync.ahk` on the RAM PCs (`BaseDir` in `dk_sync.ini`, mapped as `Y:`).
+- `AccessControl/`: the resident import (`fsbhoa_ac_import`, `Fsbhoa_Import_Settings::FOLDER_DEFAULT`), core's `export_and_trigger.py` and `run_import_rest.sh`, and old exports and database dumps.
+- `Automation/plugins/`: `fsbhoa_ac_vender_code_receiver/build-zip.sh` (a development tool).
+- The server's database backup. Check its destination: `access_control_backup_status.txt` reports writing `fsbhoa_db` to `LightingControl/`, not `AccessControl/`.
+
+**The fix: separate shares and NAS users, not a separate NAS.** The NAS enforces permissions per share and per user, so a second NAS would add only hardware isolation, at the cost of another device to patch and back up.
+1. Give each system its own NAS user with access only to its own share or folders. Access control: an `automation` share (the contents of `Automation/`) and an `accesscontrol` share (import and backups). The lighting control, PBX and the other systems that back themselves up get the same treatment, each limited to its own backup folder.
+2. On both access-control servers, mount only those shares with that user (no `/mnt/shared`), and keep the `www-data` ownership mapping to those mounts.
+3. On the RAM PCs, map the `automation` share as the drive in `BaseDir`.
+4. Change the paths: the constants above, the import's folder setting, the vehicle plugin's RAM Stream File setting (on both servers), and `dk_sync.ini`. The environment checks keep working as long as the folder names (`To_RAM_<Env>`, `Live_<Env>`) stay.
+5. Backups: decide what of the automation share is worth keeping (probably only `Logs`), and exclude the rest from the offsite and thumbdrive copies.
+6. Check that the offsite storage keeps old versions of files, whatever else is done: that is the main protection against ransomware.
+
 ## Shared conventions
 
 - REST endpoints use namespace `fsbhoa/v1`.
