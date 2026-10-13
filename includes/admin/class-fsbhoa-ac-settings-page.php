@@ -165,7 +165,7 @@ class Fsbhoa_Ac_Settings_Page {
             array($this, 'render_api_key_field'),
             $general_page_slug,
             'fsbhoa_ac_api_keys_section',
-            ['id' => 'fsbhoa_ac_verify_api_key', 'desc' => 'The one key for every service that calls this system\'s API: checking whether a person recently entered (/access/verify-email), logging gate events (/monitor/log-event) and the monitor service. Our own services (event service, DoorKing proxy, monitor service, kiosk service) get it automatically when settings are saved; restart them afterwards. Paste it into the lighting system\'s settings. Generating a new key and saving rewrites their configs.']
+            ['id' => 'fsbhoa_ac_verify_api_key', 'desc' => 'The one key for every service that calls this system\'s API: checking whether a person recently entered (/access/verify-email), logging gate events (/monitor/log-event) and the monitor service. Our own services (event service, monitor service, kiosk service, vehicle service, print service) get it automatically when settings are saved; restart them afterwards. Paste it into the lighting system\'s settings. Generating a new key and saving rewrites their configs.']
         );
         // Section: Amenity Tracking
         add_settings_section('fsbhoa_ac_amenity_tracking_section', 'Amenity Tracking Settings', null, $general_page_slug);
@@ -251,6 +251,7 @@ class Fsbhoa_Ac_Settings_Page {
         register_setting($this->monitor_settings_option_group, 'fsbhoa_monitor_map_url', 'esc_url_raw');
         register_setting($this->monitor_settings_option_group, 'fsbhoa_ac_monitor_port', 'absint');
         register_setting($this->monitor_settings_option_group, 'fsbhoa_ac_monitor_photo_limit', 'absint');
+        register_setting($this->monitor_settings_option_group, Fsbhoa_Vehicle_Log_Retention::OPTION_NAME, array('Fsbhoa_Vehicle_Log_Retention', 'sanitize_days'));
     }
 
 
@@ -415,6 +416,17 @@ class Fsbhoa_Ac_Settings_Page {
                             <p class="description">The number of recent events to display with a photo in the activity log.</p>
                         </td>
                     </tr>
+                    <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
+                    <tr>
+                        <th scope="row">
+                            <label for="fsbhoa_ac_vehicle_photo_retention_days">Vehicle Photo Retention (days)</label>
+                        </th>
+                        <td>
+                            <input name="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::OPTION_NAME); ?>" type="number" id="fsbhoa_ac_vehicle_photo_retention_days" value="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::get_days()); ?>" min="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::MIN_DAYS); ?>" max="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::MAX_DAYS); ?>" class="small-text" />
+                            <p class="description">Plate and scene photos older than this are deleted each night. The vehicle log entries themselves are kept.</p>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
     
@@ -523,6 +535,10 @@ class Fsbhoa_Ac_Settings_Page {
         update_option('fsbhoa_ac_monitor_port', $port);
         update_option('fsbhoa_monitor_status_group_id', $status_group);
         update_option('fsbhoa_ac_monitor_photo_limit', $photo_limit);
+        // Shown only when the vehicle column is on, so save it only when it was sent
+        if (isset($_POST['vehicle_photo_days'])) {
+            update_option(Fsbhoa_Vehicle_Log_Retention::OPTION_NAME, Fsbhoa_Vehicle_Log_Retention::sanitize_days($_POST['vehicle_photo_days']));
+        }
 
         // Trigger Cache Rebuild Immediately so the monitor updates instantly
         if (function_exists('fsbhoa_rebuild_monitor_status_cache')) {

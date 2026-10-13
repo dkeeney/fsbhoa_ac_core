@@ -14,7 +14,7 @@ The **core WordPress plugin**, plus one Go backend service (`monitor_service`).
 - `fsbhoa-ac-core.php` — entry point; `require_once`s every module explicitly (no autoloader). New files must be added here. Handlers are instantiated in three places: `run_fsbhoa_action_handlers()` on `init` (AJAX/`admin_post_` action classes), `fsbhoa_ac_api_init()` on `rest_api_init` (REST classes call `register_routes()`), and `is_admin()` / front-end blocks.
 - `includes/<module>/` — per-feature modules, each typically a `*-admin-page.php` (rendering, often a `WP_List_Table`), a `*-actions.php` (form/AJAX handlers registered in the constructor), and `views/` templates.
 - The UI is primarily **front-end pages rendered via shortcodes** (`includes/class-fsbhoa-shortcodes.php`: `[fsbhoa_cardholder_management]`, `[fsbhoa_live_monitor]`, `[fsbhoa_vendor_management]`, etc.), which is why `WP_List_Table` is loaded outside admin. The site forces login for all front-end pages.
-- REST routes: `/monitor/*`, `/reports/*`, `/test/*`, `/access/*`.
+- REST routes: `/monitor/*`, `/reports/*`, `/test/*`, `/access/*`, and the vehicle log's `/vehicle-event`, `/vehicle-recent` and `/vehicle-image/{id}` (`includes/monitor/class-fsbhoa-vehicle-log-rest-api.php`).
 - JS/CSS per module in `assets/js`, `assets/css`; third-party libs (jQuery UI, DataTables, Chart.js, Croppie, Tailwind) are vendored in `assets/vendor`.
 - The nightly rebuild / daily time sync cron hooks are scheduled and handled in `fsbhoa_ac_uhppote`, not core (see ARCHITECTURE.md).
 

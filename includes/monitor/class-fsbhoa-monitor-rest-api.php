@@ -13,6 +13,15 @@ class Fsbhoa_Monitor_REST_API {
 
     private $namespace = 'fsbhoa/v1';
 
+    /**
+     * Whether the live monitor shows the pedestrian column (ac_access_log). Off unless a
+     * hardware plugin that posts to /monitor/log-event turns it on through the
+     * fsbhoa_monitor_show_pedestrian_column filter, so a vehicles-only site shows no empty column.
+     */
+    public static function show_pedestrian_column() {
+        return (bool) apply_filters( 'fsbhoa_monitor_show_pedestrian_column', false );
+    }
+
     public function register_routes() {
         // Endpoint for the monitor_service to fetch a single, enriched event by its log ID.
         register_rest_route( $this->namespace, '/monitor/event', array(

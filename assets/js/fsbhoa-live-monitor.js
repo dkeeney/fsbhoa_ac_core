@@ -23,7 +23,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let lastEventTimestamp = '';
     let maxExpandedEvents = 3;
     
-    if (!eventList || !connectionStatus) {
+    // eventList is missing when no hardware plugin turns on the pedestrian column
+    // (fsbhoa_monitor_show_pedestrian_column); the map and gate lights still run.
+    if (!connectionStatus) {
         console.error("Live Monitor UI elements not found. Aborting script.");
         return;
     }
@@ -268,6 +270,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function addEventToLog(eventData) {
         console.log("Monitor: Received Event:", eventData);
+        if (!eventList) {
+            return; // No pedestrian column on this site
+        }
         
         const uniqueId = eventData.logId;
         let existingRow = null;
@@ -374,6 +379,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function loadRecentActivity() {
+        if (!eventList) {
+            return; // No pedestrian column on this site
+        }
         const ACTIVITY_API_URL = '/wp-json/fsbhoa/v1/monitor/recent-activity';
         try {
             const response = await fetch(ACTIVITY_API_URL, { headers: REST_HEADERS });

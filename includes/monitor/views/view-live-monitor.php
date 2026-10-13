@@ -86,12 +86,29 @@ function fsbhoa_render_live_monitor_view() {
        <div id="activity-log-section">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; max-width: 1400px; margin: 0 auto;">
 
+                <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
+                <!-- Vehicle Activity (ac_vehicle_log; filled by fsbhoa-vehicle-monitor.js) -->
+                <div id="vehicle-log-column">
+                    <h2 class="text-xl font-semibold mb-4">Vehicle Gate Traffic</h2>
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                        <div id="vehicle-log-container" style="height: 36rem; overflow-y: auto;">
+                            <ul id="vehicle-event-list" class="divide-y divide-gray-200">
+                                <li id="vehicle-log-placeholder" class="p-4 text-center text-gray-500">
+                                    Waiting for vehicle events...
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <?php
                 // Extension plugins add their own activity columns here, left of the pedestrian log.
                 do_action( 'fsbhoa_monitor_activity_columns' );
                 ?>
 
-                <!-- Pedestrian Activity -->
+                <?php if ( Fsbhoa_Monitor_REST_API::show_pedestrian_column() ) : ?>
+                <!-- Pedestrian Activity (ac_access_log; filled by fsbhoa-live-monitor.js) -->
                 <div id="pedestrian-log-column">
                     <h2 class="text-xl font-semibold mb-4">Pedestrian Gate Access</h2>
                     <div class="bg-white rounded-xl shadow-md overflow-hidden">
@@ -104,6 +121,7 @@ function fsbhoa_render_live_monitor_view() {
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
             </div>
         </div>
@@ -115,6 +133,17 @@ function fsbhoa_render_live_monitor_view() {
                 <!-- Rendered summary card is dynamically injected here -->
             </div>
         </div>
+        <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
+        <!-- Lightbox Modal for a vehicle's plate or scene photo (opened by openVehicleScene()) -->
+        <div id="fsbhoa-vehicle-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 20px;" onclick="this.style.display='none';">
+            <div style="max-width: 90vw; max-height: 90vh; text-align: center;" onclick="event.stopPropagation();">
+                <img id="fsbhoa-modal-img" src="" alt="Full Scene" style="max-width: 100%; max-height: 80vh; border-radius: 8px;">
+                <div style="margin-top: 10px;">
+                    <button type="button" class="button" onclick="document.getElementById('fsbhoa-vehicle-modal').style.display='none';">Close</button>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         <?php
         // Extension plugins add their own overlays (lightboxes, dialogs) here.
         do_action( 'fsbhoa_monitor_modals' );

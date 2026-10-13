@@ -340,6 +340,28 @@ CREATE TABLE `ac_vehicles` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `ac_vehicle_log`
+--
+
+CREATE TABLE `ac_vehicle_log` (
+  `vehicle_log_id` int(11) NOT NULL,
+  `event_timestamp` datetime(3) NOT NULL COMMENT 'Local time (site time zone) of the first input',
+  `gate_identifier` varchar(50) NOT NULL,
+  `auth_id` varchar(50) DEFAULT NULL COMMENT 'Credential value or PIN presented at gate',
+  `auth_type` varchar(32) DEFAULT NULL COMMENT 'Credential type for auth_id',
+  `lpr_plate_string` varchar(20) DEFAULT NULL,
+  `lpr_confidence` tinyint(3) UNSIGNED DEFAULT NULL COMMENT 'Plate reader confidence score 0-100',
+  `is_circumvention` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 if the vehicle passed without auth',
+  `context_image_data` mediumblob DEFAULT NULL,
+  `lpr_image_data` mediumblob DEFAULT NULL,
+  `raw_details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Hardware inputs and timings, as sent by the vehicle service' CHECK (json_valid(`raw_details`)),
+  `created_at` datetime DEFAULT current_timestamp(),
+  `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 --
 -- Indexes for dumped tables
 --
@@ -493,6 +515,18 @@ ALTER TABLE `ac_vehicles`
   ADD KEY `idx_vehicle_household` (`household_id`);
 
 --
+-- Indexes for table `ac_vehicle_log`
+--
+ALTER TABLE `ac_vehicle_log`
+  ADD PRIMARY KEY (`vehicle_log_id`),
+  ADD UNIQUE KEY `uniq_event_uid` (`event_uid`),
+  ADD KEY `idx_timestamp_gate` (`event_timestamp`,`gate_identifier`),
+  ADD KEY `idx_lpr_plate` (`lpr_plate_string`),
+  ADD KEY `idx_auth_id` (`auth_id`),
+  ADD KEY `idx_circumvention` (`is_circumvention`,`event_timestamp`),
+  ADD KEY `idx_auth_lookup` (`auth_type`,`auth_id`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -591,6 +625,12 @@ ALTER TABLE `ac_task_list`
 --
 ALTER TABLE `ac_vehicles`
   MODIFY `vehicle_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `ac_vehicle_log`
+--
+ALTER TABLE `ac_vehicle_log`
+  MODIFY `vehicle_log_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables

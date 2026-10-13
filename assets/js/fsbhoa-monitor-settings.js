@@ -137,6 +137,11 @@ jQuery(document).ready(function($) {
                 y: Math.round(gatePositions[id].y)
             }))
         };
+        // Vehicle photo retention is on the page only when the vehicle column is on
+        const vehiclePhotoDays = $('#fsbhoa_ac_vehicle_photo_retention_days');
+        if (vehiclePhotoDays.length) {
+            dataToSend.vehicle_photo_days = vehiclePhotoDays.val();
+        }
 
         $.post(fsbhoa_monitor_settings_vars.ajax_url, dataToSend)
             .done(function(response) {

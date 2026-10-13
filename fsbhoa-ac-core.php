@@ -59,6 +59,9 @@ function fsbhoa_ac_deactivate() {
     // Deactivation code can go here later
     // Example: require_once FSBHOA_AC_PLUGIN_DIR . 'includes/class-fsbhoa-deactivator.php';
     // Fsbhoa_Ac_Deactivator::deactivate();
+    if ( class_exists( 'Fsbhoa_Vehicle_Log_Retention' ) ) {
+        Fsbhoa_Vehicle_Log_Retention::unschedule();
+    }
 }
 register_deactivation_hook( __FILE__, 'fsbhoa_ac_deactivate' );
 
@@ -134,6 +137,10 @@ require_once FSBHOA_AC_PLUGIN_DIR . 'includes/schedules/class-fsbhoa-schedule-aj
 // --- Live Monitor ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/fsbhoa-access-service-functions.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/monitor/class-fsbhoa-monitor-rest-api.php';
+// Vehicle access log: /vehicle-* routes and the daily photo purge
+require_once FSBHOA_AC_PLUGIN_DIR . 'includes/monitor/class-fsbhoa-vehicle-log-rest-api.php';
+require_once FSBHOA_AC_PLUGIN_DIR . 'includes/monitor/class-fsbhoa-vehicle-log-retention.php';
+Fsbhoa_Vehicle_Log_Retention::init();
 
 // --- Test Suite ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/admin/class-fsbhoa-test-suite-page.php';
@@ -268,6 +275,11 @@ function fsbhoa_ac_api_init() {
     if (class_exists('Fsbhoa_Monitor_REST_API')) {
         $monitor_api = new Fsbhoa_Monitor_REST_API();
         $monitor_api->register_routes();
+    }
+    // Vehicle access log routes (/vehicle-event, /vehicle-recent, /vehicle-image)
+    if (class_exists('Fsbhoa_Vehicle_Log_REST_API')) {
+        $vehicle_log_api = new Fsbhoa_Vehicle_Log_REST_API();
+        $vehicle_log_api->register_routes();
     }
     // Instantiate the Reports REST API handler
     if (class_exists('Fsbhoa_Reports_REST_API')) {
