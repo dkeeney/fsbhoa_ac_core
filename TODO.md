@@ -14,6 +14,12 @@
 ## Core vs. extension plugins
 
 - [ ] **3. Move the Hardware audit's JavaScript to `fsbhoa_ac_uhppote`.** The click handler for `#run-hardware-audit-btn` (AJAX action `fsbhoa_run_hardware_audit`) is in core's `assets/js/fsbhoa-test-suite.js`, but the button and the handler are uhppote's. Core must not depend on an extension (`other_docs/ARCHITECTURE.md`).
+- [ ] **5. Take over the vehicle log, its routes and the monitor column from `fsbhoa_ac_vehicle`.** Decided 2026-10-13: core owns the event logs and live monitor columns for vehicles as it does for pedestrians, and the vehicle plugin keeps only the lane hardware and `vehicle_service`. Design: `fsbhoa_ac_vehicle/CLAUDE.md`, "Plugin split: core owns the vehicle log". The plugin's side is its TODO item 29. Do both in one change set and deploy them together.
+  - **Schema:** add `ac_vehicle_log` to `create_tables()`, `db_schema.sql` and `migration.sql`. Copy version 2 from `fsbhoa_ac_vehicle/includes/class-fsbhoa-vehicle-db.php`, including `auth_type`, `event_uid`, `uniq_event_uid` and `idx_auth_lookup`. Production has no vehicle functions or table (confirmed 2026-10-13), so the `migration.sql` step is a plain `CREATE TABLE IF NOT EXISTS`. The testbed already has the current table, which the vehicle plugin created.
+  - **Routes:** move `POST /vehicle-event`, `GET /vehicle-recent` and `GET /vehicle-image/{id}` with the same paths and payload. `/vehicle-event` checks only the API key (`Fsbhoa_Verification_REST_API::api_key_permission_check`), plus the environment and `event_uid` checks it has now. The other two require `manage_options`. Write the `/vehicle-event` payload down as the contract.
+  - **Monitor:** render the vehicle column and lightbox in the live monitor view, and enqueue the script, only when `apply_filters( 'fsbhoa_monitor_show_vehicle_column', false )` is true. Add the filter to `ARCHITECTURE.md` under "UI injection".
+  - **Retention:** add an Image Retention (days) setting (default 90, 1–730) and a daily purge cron that sets `context_image_data` and `lpr_image_data` to NULL on older rows, in batches as the plugin does now.
+  - **Test:** with the vehicle plugin turned off, the monitor shows no vehicle column and nothing mentions vehicles.
 
 ## Schema
 
