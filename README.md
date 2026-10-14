@@ -1,65 +1,86 @@
-# FSBHOA Access Control System 
+# FSBHOA Access Control System
 
-An open-source, self-hosted access control system designed for Homeowners Associations (HOAs). This project replaces proprietary hardware systems and their recurring subscription fees with a powerful, flexible, and cost-effective platform built on a modern, decoupled architecture.
+An open-source, self-hosted access control system for a homeowners association (HOA). It replaces proprietary systems and their recurring subscription fees with a platform the HOA owns and runs itself.
 
-The entire system is managed through a user-friendly WordPress dashboard, while lightweight backend services written in Go handle all direct communication with the physical hardware.
-
-
----
-## ## Key Features
-
-* **Centralized WordPress Administration:** A user-friendly WordPress dashboard for all management tasks.
-* **Comprehensive Cardholder Management:** Full CRUD (Create, Read, Update, Delete) for residents, tenants, and staff, including detailed profiles and photo capture via webcam or file upload.
-* **Live Activity Monitor:** A real-time, WebSocket-powered dashboard to view access events and gate statuses as they happen.
-* **Resident Sign-in Kiosk:** A dedicated touch-screen application for residents to log their use of community amenities.
-* **Hardware Management & Discovery:** Tools to manage UHPPOTE controllers and discover new hardware on the network.
-* **Powerful Permission Engine:** Create granular access rules using a system of hierarchical Permission Groups.
-* **Scheduled Tasks:** Automate door actions like locking or unlocking gates at specific times on specific days.
-* **Robust Data Management:**
-    * **CSV Import:** A powerful tool to perform bulk synchronization of resident and property data.
-    * **Archiving:** Deleted records are safely archived instead of being permanently erased, with tools to restore, merge, or purge them.
-* **Reporting & Analytics:** An access log report with filtering and CSV export, plus a dashboard for usage analytics.
-* **ID Card Printing:** A dedicated service to generate and print professional photo ID cards on a Zebra ZC300 card printer.
+Everything is managed from a WordPress site, which is the source of truth for residents, vendors, properties, credentials and settings. Small backend services written in Go talk to the hardware and push events in real time.
 
 ---
-## ## Architecture Overview
+## Key Features
 
-The core architectural principle of this system is **decoupling**. The user-facing administrative interface is completely separate from the low-level hardware services. This creates a robust, scalable, and maintainable ecosystem.
-
-`[Browser] <=> [WordPress/PHP UI] <=> [REST API] <=> [Go Services] <=> [Hardware]`
-
-* **WordPress Plugin (PHP):** Provides the web-based Graphical User Interface (GUI) for all administrative tasks. It serves as the central "source of truth" database for all cardholder, property, and configuration data.
-
-* **Backend Services (Go):** All direct interaction with physical hardware (access controllers, printers, USB card readers) is handled by a set of small, lightweight, and highly reliable backend services written in Go. They translate simple REST API and WebSocket commands into the low-level protocols required by the hardware.
-
-* **Communication:**
-    * **REST API:** The primary bridge for communication, allowing the Go services to enrich data (e.g., get cardholder details from WordPress) and for WordPress to send commands.
-    * **WebSockets:** Used by the Live Monitor and Kiosk for real-time, two-way communication.
+* **Cardholder management:** residents, tenants, staff and vendors, with photo capture by webcam or file upload. Records are archived instead of deleted, with restore, merge and purge.
+* **Two kinds of gates:**
+    * **Pedestrian gates and amenities** on UHPPOTE controllers, with permission groups, schedules and timed lock/unlock tasks.
+    * **Vehicle gates** on DoorKing 1838 controllers: windshield tags, keypad gate codes, directory codes and a monthly vendor gate code, kept in sync with DoorKing's RAM software from this system.
+* **"Push Changes Now":** a banner shows what is waiting for each kind of hardware, pushes it, and turns green only when the hardware has confirmed it.
+* **Live monitor:** a WebSocket dashboard of pedestrian and vehicle events and gate status. Vehicle events combine the DoorKing tag read, the loop sensor and the license plate camera into one event per vehicle.
+* **Amenity sign-in kiosk:** a touch screen where residents swipe their photo ID and log the amenity they're visiting.
+* **Resident import** from the HOA's property management system (PMP) by CSV.
+* **Reports and analytics:** an access log with filters and CSV export, and usage charts.
+* **ID card printing** on a Zebra ZC300 card printer.
+* **Testbed and production kept apart:** a testbed server can run the same software beside production without ever reaching production's hardware or files.
 
 ---
-## ## Technology Stack
+## Architecture
 
-* **Backend Services:** Go
-* **Frontend & Database:** PHP (custom WordPress Plugin), MySQL
-* **Client-Side:** JavaScript (jQuery, DataTables.js, Chart.js)
+`[Browser] <=> [WordPress/PHP] <=> [REST API fsbhoa/v1] <=> [Go services] <=> [Hardware]`
+
+* **WordPress plugins (PHP)** provide the user interface, mostly as front-end pages (the site requires a login), and the MySQL database.
+* **Go services** do all direct work with hardware. They read JSON configs in `/var/lib/fsbhoa/`, which the WordPress settings pages generate, and call the REST API with an API key.
+* **Communication:** REST between WordPress and the services; WebSockets for the live monitor and the kiosk.
+
+### Plugins
+
+The system is a core plugin plus extension plugins, one per kind of hardware or feature. Core never refers to an extension; extensions depend only on core, through WordPress hooks, never on each other.
+
+| Plugin | What it does | Go service |
+|---|---|---|
+| `fsbhoa_ac_core` (this repo) | Cardholders, vendors, properties, permission groups, schedules, the live monitor, the event logs, reports, archiving, the push banner | `fsbhoa_monitor` (live monitor hub) |
+| `fsbhoa_ac_uhppote` | UHPPOTE controllers: pedestrian gates and amenities, permissions, unlock tasks, nightly rebuild and time sync | `fsbhoa_events` (controller events) |
+| `fsbhoa_ac_doorking` | DoorKing 1838 credentials and the vendor-code rotation; exports to RAM, imported on the RAM PC by an AutoHotkey script (`ram_automation/DK_Sync.ahk`) | none |
+| `fsbhoa_ac_vehicle` | Vehicle lanes: loop sensors, license plate cameras and RAM's live transaction file, combined into one event per vehicle | `fsbhoa_vehicle` |
+| `fsbhoa_ac_kiosk` | The amenity sign-in kiosk | `fsbhoa_kiosk` |
+| `fsbhoa_ac_import` | CSV import from the PMP property management system | none |
+| `fsbhoa_ac_zebra` | Photo ID card printing | `fsbhoa_printer` |
+
+Each repo lives in `/home/pi/` and is symlinked into `wp-content/plugins/`. Shared rules and conventions are in `other_docs/ARCHITECTURE.md`; each repo's `CLAUDE.md` describes that plugin in detail.
+
+### Testbed and production
+
+The testbed (`testbed.fsbhoa.com`) and production share the network and the NAS. Each server's `wp-config.php` defines `FSBHOA_AC_ENVIRONMENT` (`testbed` or `production`), and anything that could reach hardware, shared folders or outside systems checks it first and does nothing if it is missing or wrong. See "Environment separation" in `other_docs/ARCHITECTURE.md`.
+
+---
+## Technology Stack
+
+* **Backend services:** Go
+* **Web application and database:** PHP (WordPress plugins), MySQL
+* **Client side:** JavaScript (jQuery, DataTables, Chart.js)
 * **Communication:** REST, WebSockets
-* **Hardware Interface:** `uhppote-cli` for controller management
+* **Hardware:** UHPPOTE controllers (through `uhppote-cli` and the uhppote library), DoorKing 1838 controllers (through DoorKing's RAM software), Shelly loop sensors, Speco license plate cameras, a USB card reader for the kiosk, a Zebra ZC300 printer
+* **Computers:** a Linux server running WordPress and the Go services (the testbed is a Raspberry Pi 5); the RAM PCs run Windows 11
 
 ---
-## ## Installation
+## Installation
 
-For detailed setup instructions, please see the **`INSTALL.md`** file and the automated **`install.sh`** script in this repository.
+Server setup is in **`main_install/INSTALL.md`**, with the `main_install/install.sh` script. Configuration after installation is in **`CONFIGURATION.md`**. Production deployment is being redesigned; until then, the steps for the current release are in `other_docs/ARCHITECTURE.md`, "To do before the production release".
 
-## ## Configuration
+## Configuration
 
-All system configuration is managed through the WordPress admin dashboard under **FSBHOA AC**. Settings are saved to the WordPress database and are used to automatically generate `.json` configuration files for the backend Go services. These files are typically written to `/var/lib/fsbhoa/`.
+All settings are in the WordPress dashboard under **FSBHOA AC**, and are stored in the WordPress database. Saving a service's settings regenerates its JSON config in `/var/lib/fsbhoa/`; restart the service afterwards. Settings that must stay with a server, such as `FSBHOA_AC_ENVIRONMENT`, are in its `wp-config.php` instead, so they never travel with a database copy.
+
+## Documentation
+
+* `USER_MANUAL.md`: using the system
+* `CONFIGURATION.md`: configuring a new installation
+* `TEST_PLAN.md`: manual test plan
+* `other_docs/ARCHITECTURE.md`: architecture, plugin rules and shared conventions
+* Each plugin's `CLAUDE.md` and `TODO.md`
 
 ---
-## ## Author
+## Author
 
 * **David Keeney** - *Initial Design & Development* - <dkeeney@gmail.com>
 with assistance from Google's Gemini model 2.5Pro who actually wrote all of the code.
 
-## ## License
+## License
 
-This project is licensed under the GPL v2 or later. See the main `fsbhoa-access-control.php` file for details.
+This project is licensed under the GPL v2 or later. See the header of `fsbhoa-ac-core.php` for details.
