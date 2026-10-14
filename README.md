@@ -79,7 +79,7 @@ All settings are in the WordPress dashboard under **FSBHOA AC**, and are stored 
 ## Author
 
 * **David Keeney** - *Initial Design & Development* - <dkeeney@gmail.com>
-with assistance from Google's Gemini model 2.5Pro who actually wrote all of the code.
+Custom developed for K. Hovnanian's Four Seasons HOA in Bakersfield, CA, with assistance from Google's Gemini 2.5 Pro, which wrote most of the early code, and Claude Code running Opus 5.5, which took over to clean it up.
 
 ## License
 
