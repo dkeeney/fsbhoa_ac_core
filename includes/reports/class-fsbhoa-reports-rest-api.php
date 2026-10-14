@@ -117,8 +117,8 @@ class Fsbhoa_Reports_REST_API {
 public function get_usage_analytics_callback( WP_REST_Request $request ) {
         global $wpdb;
 
-        $year = $request->get_param('year') ? absint($request->get_param('year')) : date('Y');
-        $month = $request->get_param('month') ? absint($request->get_param('month')) : date('m');
+        $year = $request->get_param('year') ? absint($request->get_param('year')) : current_time('Y');
+        $month = $request->get_param('month') ? absint($request->get_param('month')) : current_time('m');
 
         $response_data = [
             'gateUsage'   => [],
@@ -201,8 +201,8 @@ public function get_usage_analytics_callback( WP_REST_Request $request ) {
      * Returns a summary of usage (Total People) for Today, Yesterday, and the selected Month.
      */
     public function get_daily_summary_callback( WP_REST_Request $request ) {
-        $year = $request->get_param('year') ? absint($request->get_param('year')) : date('Y');
-        $month = $request->get_param('month') ? absint($request->get_param('month')) : date('m');
+        $year = $request->get_param('year') ? absint($request->get_param('year')) : current_time('Y');
+        $month = $request->get_param('month') ? absint($request->get_param('month')) : current_time('m');
 
         // 1. Get Data for "Today"
         $today_start = current_time('Y-m-d 00:00:00');

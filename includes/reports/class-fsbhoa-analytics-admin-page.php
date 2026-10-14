@@ -20,7 +20,7 @@ class Fsbhoa_Analytics_Admin_Page {
                         <label for="analytics-month">Month</label>
                         <select id="analytics-month">
                             <?php
-                            $current_month = date('m');
+                            $current_month = current_time('m');
                             for ($i = 1; $i <= 12; $i++) {
                                 $month_val = str_pad($i, 2, '0', STR_PAD_LEFT);
                                 $month_name = date('F', mktime(0, 0, 0, $i, 10));
@@ -33,7 +33,7 @@ class Fsbhoa_Analytics_Admin_Page {
                         <label for="analytics-year">Year</label>
                         <select id="analytics-year">
                             <?php
-                            $current_year = date('Y');
+                            $current_year = current_time('Y');
                             for ($i = $current_year; $i >= $current_year - 5; $i--) {
                                 echo '<option value="' . esc_attr($i) . '">' . esc_html($i) . '</option>';
                             }

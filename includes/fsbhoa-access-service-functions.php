@@ -123,13 +123,15 @@ class Fsbhoa_Access_Service {
             return 'Card ' . $value . ' is not in the system';
         }
 
-        $now   = current_time( 'timestamp' );
+        $today = current_time( 'Y-m-d' );
         $parts = [];
         foreach ( $creds as $cred ) {
             $type   = $cred->credential_type === 'MIFARE_BADGE' ? 'Badge' : ( $cred->type_name ?: $cred->credential_type );
             $status = $cred->status !== '' ? $cred->status : 'no status';
-            if ( ! empty( $cred->expiration_date ) && strtotime( $cred->expiration_date ) < $now ) {
-                $status .= ', expired ' . date( 'Y-m-d', strtotime( $cred->expiration_date ) );
+            // Valid through the expiry date, like the UHPPOTE controller's "To" date
+            $expiry = substr( (string) $cred->expiration_date, 0, 10 );
+            if ( $expiry !== '' && $expiry !== '0000-00-00' && $expiry < $today ) {
+                $status .= ', expired ' . $expiry;
             }
             $text = $type . ' ' . $cred->credential_value . ': ' . $status;
 

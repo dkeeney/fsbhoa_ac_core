@@ -55,7 +55,7 @@ class Fsbhoa_Reports_Actions {
             wp_die( 'Database error generating export: ' . esc_html( $wpdb->last_error ) );
         }
 
-        $filename = "access-log-" . date('Y-m-d') . ".csv";
+        $filename = "access-log-" . current_time('Y-m-d') . ".csv";
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
 
@@ -99,7 +99,7 @@ class Fsbhoa_Reports_Actions {
             wp_die( 'Database error generating export: ' . esc_html( $wpdb->last_error ) );
         }
 
-        $filename = "access-log-selected-" . date('Y-m-d') . ".csv";
+        $filename = "access-log-selected-" . current_time('Y-m-d') . ".csv";
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
 

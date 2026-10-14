@@ -561,7 +561,7 @@ class Fsbhoa_Cardholder_Actions {
             $items_to_export[$key]['photo_url'] = $photo_url;
         }
 
-        $filename = 'cardholder-export-' . date('Y-m-d') . '.csv';
+        $filename = 'cardholder-export-' . current_time('Y-m-d') . '.csv';
         header( 'Content-Type: text/csv' );
         header( 'Content-Disposition: attachment; filename=' . $filename );
         $output = fopen( 'php://output', 'w' );
