@@ -59,9 +59,10 @@ class Fsbhoa_Verification_REST_API {
         $log_table = 'ac_access_log';
         $cardholders_table = 'ac_cardholders';
         
-        // Query: Join Logs to Cardholders to find a valid swipe by this email
+        // Query: Join Logs to Cardholders to find a valid swipe by this email. The card number
+        // is the one swiped in that entry (card numbers live in ac_credentials, not ac_cardholders).
         $query = $wpdb->prepare("
-            SELECT log.event_timestamp, log.amenity_name, log.controller_identifier, log.door_number, ch.rfid_id
+            SELECT log.event_timestamp, log.amenity_name, log.controller_identifier, log.door_number, log.rfid_id
             FROM {$log_table} log
             INNER JOIN {$cardholders_table} ch ON log.cardholder_id = ch.id
             WHERE ch.email = %s

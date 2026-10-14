@@ -150,6 +150,24 @@ class Fsbhoa_Monitor_REST_API {
         $provided_door = absint($params['Door'] ?? 0);
         $zone_name = sanitize_text_field($params['ZoneName'] ?? '');
 
+        // A sender that names its door (e.g. the lighting system's QR scans on controller
+        // 900001, which send the lighting zone's name and ID) is logged at the door with that
+        // name on its controller. The names must match (the lighting zones and the gates).
+        if ( $zone_name !== '' && $serial !== '' ) {
+            $named_door = $wpdb->get_var( $wpdb->prepare( "
+                SELECT d.door_number_on_controller
+                FROM ac_doors d
+                JOIN ac_controllers c ON d.controller_record_id = c.controller_record_id
+                WHERE c.uhppoted_device_id = %s AND d.friendly_name = %s
+                LIMIT 1
+            ", $serial, $zone_name ) );
+            if ( $named_door !== null ) {
+                $provided_door = absint( $named_door );
+            } else {
+                error_log( "FSBHOA EVENT WARNING: No gate named '{$zone_name}' on controller {$serial}; logging at door {$provided_door} as sent. Add a gate with that name." );
+            }
+        }
+
         // Allow hardware plugins to intercept and modify the raw event data
         // (e.g., mapping virtual zones to physical doors)
         $mapped_data = apply_filters('fsbhoa_hardware_map_event_data', [
