@@ -98,12 +98,13 @@ Recorded 2026-10-13; not scheduled yet. The NAS holds the HOA's official records
 
 **What this system uses on the NAS** (as of 2026-10-13):
 - `Automation/DoorKing/` (`To_RAM_<Env>`, `Live_<Env>`, `Logs`): the DoorKing export (`Fsbhoa_DoorKing_Export::SYNC_BASE_DIR`), the vehicle plugin's RAM Disk File reader (`FSBHOA_Vehicle_Settings::RAM_FILE_BASE_DIR` and the RAM Stream File setting), and `DK_Sync.ahk` on the RAM PCs (`BaseDir` in `dk_sync.ini`, mapped as `Y:`).
-- `AccessControl/`: the resident import (`fsbhoa_ac_import`, `Fsbhoa_Import_Settings::FOLDER_DEFAULT`), core's `export_and_trigger.py` and `run_import_rest.sh`, and old exports and database dumps.
+- `Automation/Import/` (`<environment>/` below it): the resident import (`fsbhoa_ac_import`, `Fsbhoa_Import_Settings::FOLDER_DEFAULT`, since 2026-10-14) and its export script.
+- `AccessControl/`: backups, plus the old import folder (still used by the export script until it is moved; `fsbhoa_ac_import` TODO #3), core's `export_and_trigger.py` and `run_import_rest.sh`, and old exports and database dumps.
 - `Automation/plugins/`: `fsbhoa_ac_vender_code_receiver/build-zip.sh` (a development tool).
 - Production's nightly WordPress backup (confirmed 2026-10-13; the testbed runs none). At 00:30 it backs up the database `fsbhoa_db` and `wp-content/uploads` (about 21 MB), deletes copies older than 30 days, and writes `access_control_backup_status.txt` at the top of the share. It writes into `LightingControl/`, the lighting system's folder, instead of `AccessControl/`. Fix the destination as part of step 2 below, or the backup fails once production can reach only its own share.
 
 **The fix: separate shares and NAS users, not a separate NAS.** The NAS enforces permissions per share and per user, so a second NAS would add only hardware isolation, at the cost of another device to patch and back up.
-1. Give each system its own NAS user with access only to its own share or folders. Access control: an `automation` share (the contents of `Automation/`) and an `accesscontrol` share (import and backups). The lighting control, PBX and the other systems that back themselves up get the same treatment, each limited to its own backup folder.
+1. Give each system its own NAS user with access only to its own share or folders. Access control: an `automation` share (the contents of `Automation/`, including the import) and an `accesscontrol` share (backups). The lighting control, PBX and the other systems that back themselves up get the same treatment, each limited to its own backup folder.
 2. On both access-control servers, mount only those shares with that user (no `/mnt/shared`), and keep the `www-data` ownership mapping to those mounts.
 3. On the RAM PCs, map the `automation` share as the drive in `BaseDir`.
 4. Change the paths: the constants above, the import's folder setting, the vehicle plugin's RAM Stream File setting (on both servers), and `dk_sync.ini`. The environment checks keep working as long as the folder names (`To_RAM_<Env>`, `Live_<Env>`) stay.
