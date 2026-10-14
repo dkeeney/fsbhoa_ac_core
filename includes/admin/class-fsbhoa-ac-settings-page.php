@@ -59,7 +59,7 @@ class Fsbhoa_Ac_Settings_Page {
         $websocket_port   = get_option('fsbhoa_ac_websocket_port', 8083);
         $tls_cert_path    = get_option('fsbhoa_ac_tls_cert_path', '/etc/letsencrypt/live/nas.fsbhoa.com/fullchain.pem');
         $tls_key_path     = get_option('fsbhoa_ac_tls_key_path', '/etc/letsencrypt/live/nas.fsbhoa.com/privkey.pem');
-        $wp_host          = get_option('fsbhoa_ac_wp_host', 'access.fsbhoa.com');
+        $wp_host          = trim((string) get_option('fsbhoa_ac_wp_host', ''));
         // Determine the correct protocol based on whether TLS is configured.
         $protocol         = (!empty($tls_cert_path) && !empty($tls_key_path)) ? 'https' : 'http';
         $wp_port          = get_option('fsbhoa_ac_wp_port', 443);
@@ -71,6 +71,15 @@ class Fsbhoa_Ac_Settings_Page {
         $pool_alarm_enable_url  = get_option('fsbhoa_pool_alarm_enable_url', '');
         $pool_alarm_disable_url = get_option('fsbhoa_pool_alarm_disable_url', '');
         $pool_alarm_gates       = get_option('fsbhoa_pool_alarm_gates', []);
+
+        // Fail closed: without this server's own host name, the event service URL could point
+        // at another system (e.g. a testbed reaching production). Keep the existing
+        // monitor_service.json rather than guess; extensions' configs check for themselves.
+        if ($wp_host === '') {
+            error_log('FSBHOA Settings: Not writing ' . $this->monitor_service_config_path . ': the WordPress API Host (fsbhoa_ac_wp_host) is not set in General settings.');
+            do_action('fsbhoa_update_service_configs');
+            return;
+        }
 
         // --- Build and write monitor_service.json ---
         $monitor_config = [
@@ -126,7 +135,7 @@ class Fsbhoa_Ac_Settings_Page {
         // Service Communication 
         add_settings_section('fsbhoa_ac_service_comm_section', 'Service Communication Settings', null, $general_page_slug);
         $comm_fields = [
-            'fsbhoa_ac_wp_host'         => ['label' => 'WordPress API Host', 'default' => 'nas.fsbhoa.com'],
+            'fsbhoa_ac_wp_host'         => ['label' => 'WordPress API Host', 'default' => '', 'desc' => 'This server\'s own host name, e.g. testbed.fsbhoa.com. The services and the live monitor connect to it. While it is blank, the service configs are not written and the monitor does not connect.'],
             'fsbhoa_ac_wp_port'         => ['label' => 'WordPress API Port', 'type' => 'number', 'default' => 443],
             'fsbhoa_ac_tls_cert_path'   => ['label' => 'TLS Certificate Path', 'default' => '/etc/letsencrypt/live/nas.fsbhoa.com/fullchain.pem'],
             'fsbhoa_ac_tls_key_path'    => ['label' => 'TLS Key Path', 'default' => '/etc/letsencrypt/live/nas.fsbhoa.com/privkey.pem'],

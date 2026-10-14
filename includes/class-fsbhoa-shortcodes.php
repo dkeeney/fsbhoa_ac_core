@@ -192,8 +192,15 @@ class Fsbhoa_Shortcodes {
             wp_enqueue_script($script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-live-monitor.js', [], FSBHOA_AC_PLUGIN_VERSION, true);
 
             $ws_port = get_option('fsbhoa_ac_monitor_port', 8082);
-            $ws_host = get_option('fsbhoa_ac_wp_host', 'access.fsbhoa.com');
-            $ws_url = sprintf('wss://%s:%d/ws', $ws_host, $ws_port);
+            // Fail closed: with no host set, connect nowhere (the page shows "Configuration Error")
+            // rather than guess one, which could be another system's (e.g. production's).
+            $ws_host = trim((string) get_option('fsbhoa_ac_wp_host', ''));
+            $ws_url = '';
+            if ($ws_host === '') {
+                error_log('FSBHOA Live Monitor: no websocket address: the WordPress API Host (fsbhoa_ac_wp_host) is not set in General settings.');
+            } else {
+                $ws_url = sprintf('wss://%s:%d/ws', $ws_host, $ws_port);
+            }
 
             wp_localize_script($script_handle, 'fsbhoa_monitor_vars', [ 'ws_url' => $ws_url, 'nonce' => wp_create_nonce('wp_rest') ]);
 
