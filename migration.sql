@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS `ac_credentials` (
   `credential_value` varchar(50) NOT NULL,
   `status` ENUM('active', 'disabled', 'inactive') NOT NULL DEFAULT 'inactive',
   `issue_date` date DEFAULT (CURRENT_DATE),
-  `expiration_date` datetime DEFAULT NULL,
+  `expiration_date` date NOT NULL DEFAULT '2099-12-31' COMMENT 'Valid through the end of this date; 2099-12-31 = never expires',
   `notes` text,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -208,7 +208,7 @@ SELECT
     ELSE 'active'
   END AS `status`,
   COALESCE(`card_issue_date`, CURRENT_DATE) AS `issue_date`,
-  COALESCE(`card_expiry_date`, '2099-12-31 23:59:59') AS `expiration_date`
+  DATE(COALESCE(`card_expiry_date`, '2099-12-31')) AS `expiration_date`
 FROM `ac_cardholders`
 WHERE `rfid_id` IS NOT NULL AND `rfid_id` != '';
 
@@ -276,5 +276,16 @@ ALTER TABLE `ac_access_log` MODIFY COLUMN `door_number` tinyint(3) unsigned NOT 
 ALTER TABLE `ac_task_list`  MODIFY COLUMN `door_number` tinyint(3) unsigned DEFAULT NULL COMMENT '1-4, or NULL for all doors on the targeted controller(s)';
 UPDATE `ac_doors`      SET `door_number_on_controller` = 254 WHERE `door_number_on_controller` = 127;
 UPDATE `ac_access_log` SET `door_number` = 254 WHERE `door_number` = 127;
+
+-- ==============================================================================
+-- STEP 11: Credential expiry is a date; 2099-12-31 means it never expires
+-- ==============================================================================
+-- A credential is valid through the end of its expiration_date. Badges were saved with
+-- 2099-12-31, but most DoorKing credentials with no date (NULL). The time part is dropped
+-- first so the ALTER truncates nothing.
+UPDATE `ac_credentials` SET `expiration_date` = '2099-12-31' WHERE `expiration_date` IS NULL OR `expiration_date` < '1000-01-01';
+UPDATE `ac_credentials` SET `expiration_date` = DATE(`expiration_date`);
+ALTER TABLE `ac_credentials`
+  MODIFY COLUMN `expiration_date` date NOT NULL DEFAULT '2099-12-31' COMMENT 'Valid through the end of this date; 2099-12-31 = never expires';
 
 SET FOREIGN_KEY_CHECKS = 1;

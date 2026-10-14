@@ -685,7 +685,8 @@ class Fsbhoa_Ac_Settings_Page {
                         'cardholder_id'    => $new_cardholder_id,
                         'credential_type'  => 'MIFARE_BADGE',
                         'credential_value' => $rfid_to_insert,
-                        'status'           => 'active'
+                        'status'           => 'active',
+                        'expiration_date'  => '2099-12-31'
                     ]);
                 }
             }

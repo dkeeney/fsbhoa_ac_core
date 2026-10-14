@@ -342,7 +342,7 @@ class Fsbhoa_Core_Repository {
             `credential_value` varchar(50) NOT NULL,
             `status` ENUM('active', 'disabled', 'inactive') NOT NULL DEFAULT 'inactive',
             `issue_date` date DEFAULT CURRENT_TIMESTAMP,
-            `expiration_date` datetime DEFAULT NULL,
+            `expiration_date` date NOT NULL DEFAULT '2099-12-31' COMMENT 'Valid through the end of this date; 2099-12-31 = never expires',
             `notes` text,
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

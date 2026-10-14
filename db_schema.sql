@@ -134,7 +134,7 @@ CREATE TABLE `ac_credentials` (
   `credential_value` varchar(50) NOT NULL,
   `status` enum('active','disabled','inactive') NOT NULL DEFAULT 'inactive',
   `issue_date` date DEFAULT curdate(),
-  `expiration_date` datetime DEFAULT NULL,
+  `expiration_date` date NOT NULL DEFAULT '2099-12-31' COMMENT 'Valid through the end of this date; 2099-12-31 = never expires',
   `notes` text DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
