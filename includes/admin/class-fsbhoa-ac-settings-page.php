@@ -566,13 +566,24 @@ class Fsbhoa_Ac_Settings_Page {
             wp_send_json_error('Permission denied.', 403);
         }
 
-        $options = isset($_POST['options']) ? $_POST['options'] : [];
-        if (!empty($options)) {
-            foreach ($options as $option) {
-                // All general options are text fields for now, so we can sanitize them the same way.
-                // We can add more specific sanitization here if needed in the future.
-                update_option(sanitize_key($option['name']), sanitize_text_field($option['value']));
+        // Only options registered in the General group are saved: core's own and any an
+        // extension adds with register_setting('fsbhoa_general_options', ...) (e.g. the import
+        // plugin's folder). update_option() cleans each with the sanitize callback it was registered with.
+        $allowed = [];
+        foreach (get_registered_settings() as $name => $args) {
+            if (($args['group'] ?? '') === 'fsbhoa_general_options') {
+                $allowed[$name] = true;
             }
+        }
+
+        $options = isset($_POST['options']) && is_array($_POST['options']) ? wp_unslash($_POST['options']) : [];
+        foreach ($options as $option) {
+            $name = sanitize_key($option['name'] ?? '');
+            if (!isset($allowed[$name])) {
+                error_log("FSBHOA General Settings: ignored unregistered option '{$name}'.");
+                continue;
+            }
+            update_option($name, $option['value'] ?? '');
         }
 
         $this->update_all_service_configs();
