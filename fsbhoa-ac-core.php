@@ -111,6 +111,9 @@ require_once FSBHOA_AC_PLUGIN_DIR . 'includes/admin/class-fsbhoa-system-actions.
 
 // Sync Functions
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/fsbhoa-sync-functions.php';
+// Pushing pending changes to the hardware, and the red banner (fsbhoa_push_targets, fsbhoa_push_to_controllers)
+require_once FSBHOA_AC_PLUGIN_DIR . 'includes/class-fsbhoa-push.php';
+Fsbhoa_Push::init();
 
 // --- Cardholder Module (Moved) ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/fsbhoa-cardholder-functions.php';

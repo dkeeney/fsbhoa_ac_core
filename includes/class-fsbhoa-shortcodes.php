@@ -19,9 +19,7 @@ class Fsbhoa_Shortcodes {
         add_shortcode( 'fsbhoa_schedules_page', [$this, 'render_schedules_page_shortcode'] );
         add_shortcode( 'fsbhoa_vendor_management', array( $this, 'render_vendor_management_shortcode' ) );
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_shortcode_assets' ) );
-        add_action( 'wp_body_open', array( $this, 'display_sync_banner' ) );
-        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_shortcode_assets' ) );
-        add_action( 'wp_body_open', array( $this, 'display_sync_banner' ) );
+        add_action( 'wp_body_open', array( 'Fsbhoa_Push', 'render_banner' ) );
         add_action( 'wp_footer', array( $this, 'render_summary_modal_container' ) );
         add_action( 'wp_ajax_fsbhoa_get_cardholder_summary', [ $this, 'ajax_get_cardholder_summary' ] );
     }
@@ -69,13 +67,10 @@ class Fsbhoa_Shortcodes {
         // ASSETS FOR: sync banner.  They are used by every shortcode
         wp_enqueue_script('fsbhoa-sync-script', FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-sync-admin.js', ['jquery'], FSBHOA_AC_PLUGIN_VERSION, true);
 
-        $sync_status_transient = get_transient('fsbhoa_sync_status');
-        $is_sync_in_progress = ($sync_status_transient && isset($sync_status_transient['status']) && $sync_status_transient['status'] === 'in_progress');
-
         wp_localize_script('fsbhoa-sync-script', 'fsbhoa_sync_vars', [
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('fsbhoa_sync_nonce'),
-            'is_sync_in_progress' => $is_sync_in_progress
+            'nonce' => wp_create_nonce( Fsbhoa_Push::NONCE ),
+            'is_sync_in_progress' => Fsbhoa_Push::in_progress()
         ]);
 
 
@@ -522,37 +517,6 @@ class Fsbhoa_Shortcodes {
         }
 
         return ob_get_clean();
-    }
-
-    /**
-     * Checks for pending changes and displays a sync banner if needed.
-     * This is hooked into wp_body_open to be theme-independent.
-     */
-    public function display_sync_banner() {
-        global $wpdb;
-        $table_name = 'ac_pending_changes';
-
-        // This is a very fast query.
-        $pending_count = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
-
-        // If there are no pending changes, do nothing.
-        if ($pending_count == 0) {
-            return;
-        }
-
-        // If there are pending changes, display the banner.
-        $sync_page_url = get_permalink(get_page_by_path('hardware-management')); // Assumes your sync page has this slug
-        $sync_url = add_query_arg('view', 'sync', $sync_page_url);
-?>
-        <div id="fsbhoa-sync-banner">
-            <div class="fsbhoa-sync-banner-content">
-                <span class="dashicons dashicons-warning"></span>
-                <span id="fsbhoa-sync-banner-message">There are pending changes that need to be pushed to the controllers.</span>
-                
-                <button id="fsbhoa-sync-banner-button" class="button button-primary">Push Changes Now</button>
-            </div>
-        </div>
-        <?php
     }
 
     /**
