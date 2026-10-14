@@ -99,7 +99,7 @@ Recorded 2026-10-13; not scheduled yet. The NAS holds the HOA's official records
 **What this system uses on the NAS** (as of 2026-10-13):
 - `Automation/DoorKing/` (`To_RAM_<Env>`, `Live_<Env>`, `Logs`): the DoorKing export (`Fsbhoa_DoorKing_Export::SYNC_BASE_DIR`), the vehicle plugin's RAM Disk File reader (`FSBHOA_Vehicle_Settings::RAM_FILE_BASE_DIR` and the RAM Stream File setting), and `DK_Sync.ahk` on the RAM PCs (`BaseDir` in `dk_sync.ini`, mapped as `Y:`).
 - `Automation/Import/` (`<environment>/` below it): the resident import (`fsbhoa_ac_import`, `Fsbhoa_Import_Settings::FOLDER_DEFAULT`, since 2026-10-14) and its export script.
-- `AccessControl/`: backups, plus the old import folder (still used by the export script until it is moved; `fsbhoa_ac_import` TODO #3), core's `export_and_trigger.py` and `run_import_rest.sh`, and old exports and database dumps.
+- `AccessControl/`: backups, plus the old import folder and the export script the office PC runs (`export_and_trigger.py`, kept in `fsbhoa_ac_import/scripts/`), both used until they are moved (`fsbhoa_ac_import` TODO #3), and old exports and database dumps.
 - `Automation/plugins/`: `fsbhoa_ac_vender_code_receiver/build-zip.sh` (a development tool).
 - Production's nightly WordPress backup (confirmed 2026-10-13; the testbed runs none). At 00:30 it backs up the database `fsbhoa_db` and `wp-content/uploads` (about 21 MB), deletes copies older than 30 days, and writes `access_control_backup_status.txt` at the top of the share. It writes into `LightingControl/`, the lighting system's folder, instead of `AccessControl/`. Fix the destination as part of step 2 below, or the backup fails once production can reach only its own share.
 
