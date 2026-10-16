@@ -182,6 +182,12 @@ jQuery(document).ready(function($) {
                         logResult('  Every card on the board has the dates and door settings the compiler expects.');
                     }
 
+                    // Differences in the card list that a lookup by number showed were wrong replies
+                    if (report.misread_count > 0) {
+                        logResult('  Card list misreads ruled out by looking the cards up by number: ' + report.misread_count + ' (not a problem on the board).');
+                        logList('', report.misreads);
+                    }
+
                     // Time profiles whose days or times differ from the compiler's
                     if (Object.keys(report.profile_mismatches || {}).length > 0) {
                         logResult('  [!] Time profiles that differ from the compiler:', 'error');
