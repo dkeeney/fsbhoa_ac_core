@@ -33,6 +33,12 @@ cd "$BASE_DIR/zebra_print_service" || exit
 go build -o fsbhoa_printer .
 if [ $? -eq 0 ]; then echo "   [OK] fsbhoa_printer built"; else echo "   [FAIL] Printer build failed"; exit 1; fi
 
+# --- 5. CARD LOADER (run by the bulk sync; not a service) ---
+echo "5. Building Card Loader..."
+cd "$BASE_DIR/acl_loader" || exit
+go build -o fsbhoa_load_acl .
+if [ $? -eq 0 ]; then echo "   [OK] fsbhoa_load_acl built"; else echo "   [FAIL] Card loader build failed"; exit 1; fi
+
 # --- OPTIONAL: INSTALL ---
 if [ "$1" == "install" ]; then
     echo ""
@@ -51,6 +57,7 @@ if [ "$1" == "install" ]; then
     sudo cp "$BASE_DIR/kiosk/fsbhoa_kiosk" /usr/local/bin/
     sudo cp "$BASE_DIR/event_service/fsbhoa_events" /usr/local/bin/
     sudo cp "$BASE_DIR/zebra_print_service/fsbhoa_printer" /usr/local/bin/
+    sudo cp "$BASE_DIR/acl_loader/fsbhoa_load_acl" /usr/local/bin/
     
     # 3. SET PERMISSIONS (Root ownership is safer for system binaries)
     echo "Setting permissions..."

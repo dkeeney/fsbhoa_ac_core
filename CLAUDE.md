@@ -29,6 +29,17 @@
 - Logs: `error_log()` goes to `/var/www/html/wp-content/debug.log` (large; grep it, don't cat it). Grep for `SYNC SUCCESS|SYNC WARNING|SYNC FATAL|NIGHTLY REBUILD`.
 - Read-only diagnostics: `uhppote-cli get-card <controller> <card>`, `get-cards <controller>` (slow, ~1–2 min per controller), `get-time-profiles <controller>`.
 
+## Backported from V2 (2026-10-16)
+
+Cards were sometimes denied ("No Permissions") until a later sync; the cause isn't known yet (fsbhoa_ac_uhppote TODO #28 on the V2 side). These changes add evidence and tighten the card load:
+
+- **Card loader `fsbhoa_load_acl`** (`acl_loader/`, built by `rebuild.sh`, installed to `/usr/local/bin`). The bulk sync uses it instead of `uhppote-cli load-acl` when it's installed (same arguments, TSV and summary line). It paces requests, checks each time profile once, retries a rejected card, and prints two diagnostic lines that end up in the `SYNC SUCCESS`/`SYNC RESORT` log lines: `table before the load:` (cards, last slot, gaps, cards out of order) and `changes:` (card numbers added, updated, deleted).
+- **Re-sort after updates too.** The controller moves a changed card to the end of its table (old slot marked deleted), so any load that changes a table that had cards now wipes and reloads it in order, not only one that adds or deletes cards.
+- **Every wipe checks the controller is empty** (`Fsbhoa_Uhppote_Bulk_Sync::wipe_cards()`, used by the recovery wipe and the nightly wipe): `fsbhoa_load_acl --config /etc/uhppoted/uhppoted.conf --count <serial>` after the 4 s settle, and `delete-all` again if any card is left (it often leaves the card in slot 1), up to 3 times.
+- **Denial check** (`event_service/denial_check.go`). When a controller denies a card with "no access rights" (reason 6), the event service looks the card up at once and logs a `DENIAL CHECK:` line (`journalctl -u fsbhoa_events | grep "DENIAL CHECK"`): found (with the door's setting), `NO RECORD` but stored in slot N (the controller can't find a card it holds), or `NO RECORD` and not stored (missing). V1 has no controller locks, so a check may overlap a sync; compare with the sync log.
+
+To deploy: `git pull` here (the PHP is live at once), then build and install only the event service and the loader (`cd event_service && go build -o fsbhoa_events .`, `cd acl_loader && go build -o fsbhoa_load_acl .`, copy both to `/usr/local/bin`, `sudo systemctl restart fsbhoa_events`). Until the loader is installed, the bulk sync falls back to `uhppote-cli load-acl` and skips the empty check, with a log line.
+
 ## Working conventions (from David)
 
 - Prefer small, targeted edits over whole-file rewrites; preserve existing comments and debug lines.

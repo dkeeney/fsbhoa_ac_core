@@ -10,6 +10,18 @@ class Fsbhoa_Uhppote_Bulk_Sync {
     // Maximum time for a single load-acl attempt before it is killed and retried.
     const LOAD_ACL_TIMEOUT_SECONDS = 180;
 
+    // Our card loader (acl_loader/, built by rebuild.sh), backported from V2 on 2026-10-16. It takes
+    // the same arguments and TSV as `uhppote-cli load-acl` and prints the same summary line, with
+    // paced requests, one check of each time profile, an immediate retry of a rejected card, and
+    // two more lines for diagnosing cards that can't be found: the layout of the card table it
+    // read and the numbers of the cards it changed. If it isn't installed, load-acl is used.
+    const LOADER = '/usr/local/bin/fsbhoa_load_acl';
+    // The hand-written config the V1 delete-all commands use; it lists every controller's address.
+    const CLI_CONFIG = '/etc/uhppoted/uhppoted.conf';
+    const WIPE_TRIES    = 3;  // delete-all runs at most this many times until the controller reads empty
+    const WIPE_SETTLE   = 4;  // seconds after delete-all for the flash erase
+    const COUNT_TIMEOUT = 60; // seconds for the card count check
+
     /**
      * Executes the bulk load-acl process for a single controller.
      */
@@ -127,10 +139,16 @@ class Fsbhoa_Uhppote_Bulk_Sync {
         // Each attempt is capped with `timeout` so a hung controller cannot stall
         // the whole sync. A normal load takes 5-70s (North Gate is the slowest).
         // The exit status is appended so a timeout (exit 124) can be logged clearly.
+        if (is_executable(self::LOADER)) {
+            $loader = escapeshellarg(self::LOADER) . ' --config ' . escapeshellarg($conf_path);
+        } else {
+            error_log("SYNC WARNING (BULK ACL): " . self::LOADER . " is not installed; using uhppote-cli load-acl.");
+            $loader = 'uhppote-cli --config ' . escapeshellarg($conf_path) . ' load-acl';
+        }
         $bulk_command = sprintf(
-            'timeout %d uhppote-cli --config %s load-acl %s 2>&1; echo "[exit=$?]"',
+            'timeout %d %s %s 2>&1; echo "[exit=$?]"',
             self::LOAD_ACL_TIMEOUT_SECONDS,
-            escapeshellarg($conf_path),
+            $loader,
             escapeshellarg($tsv_path)
         );
         
@@ -194,16 +212,20 @@ class Fsbhoa_Uhppote_Bulk_Sync {
 
                 $clean_output = trim(preg_replace('/\s+/', ' ', (string)$output));
 
-                // Did this load insert/remove cards in a table that already had cards?
-                // If so the new cards were appended out of order -> rebuild the table.
+                // Did this load change a table that already had cards? Added cards are appended at
+                // the end, a changed card is moved to the end (its old slot marked deleted), and a
+                // deleted card leaves its slot marked deleted -> rebuild the table in order.
+                // Only a full load into an empty table needs nothing more.
                 if (!$wiped_this_run && $attempt < 3
-                    && preg_match('/unchanged:\s*(\d+).*?added:\s*(\d+)\s+deleted:\s*(\d+)/', $output, $counts)) {
+                    && preg_match('/unchanged:\s*(\d+)\s+updated:\s*(\d+)\s+added:\s*(\d+)\s+deleted:\s*(\d+)/', $output, $counts)) {
                     $unchanged = (int)$counts[1];
-                    $added     = (int)$counts[2];
-                    $deleted   = (int)$counts[3];
+                    $updated   = (int)$counts[2];
+                    $added     = (int)$counts[3];
+                    $deleted   = (int)$counts[4];
+                    $had_cards = $unchanged > 0 || $updated > 0 || $deleted > 0;
 
-                    if ($unchanged > 0 && ($added > 0 || $deleted > 0)) {
-                        error_log("SYNC RESORT: load-acl for {$device_id} added {$added} / deleted {$deleted} cards in a populated table ({$clean_output}). Wiping and reloading to keep the card table sorted...");
+                    if ($had_cards && ($added > 0 || $updated > 0 || $deleted > 0)) {
+                        error_log("SYNC RESORT: load-acl for {$device_id} added {$added} / updated {$updated} / deleted {$deleted} cards in a populated table ({$clean_output}). Wiping and reloading to keep the card table sorted...");
                         $needs_wipe = true;
                         continue; // Loop back, wipe, and reload in sorted order
                     }
@@ -229,18 +251,66 @@ class Fsbhoa_Uhppote_Bulk_Sync {
      */
     private function wipe_controller_cards($device_id) {
         $wipe_cmd = sprintf('uhppote-cli delete-all %s 2>&1', escapeshellarg($device_id));
+        self::wipe_cards($device_id, function () use ($wipe_cmd) {
+            return shell_exec($wipe_cmd);
+        }, 'SYNC RECOVERY');
+    }
 
-        $wipe_out = shell_exec($wipe_cmd);
-        $clean_wipe = trim(preg_replace('/\s+/', ' ', (string)$wipe_out));
-        if (empty($clean_wipe) || strpos($clean_wipe, 'ERROR') !== false) {
-            error_log("SYNC RECOVERY WARNING: delete-all for {$device_id} may have failed: {$clean_wipe}");
-        } else {
-            error_log("SYNC RECOVERY: delete-all output for {$device_id}: {$clean_wipe}");
+    /**
+     * Runs delete-all, waits for the flash erase, and checks the controller is empty. `delete-all`
+     * often leaves the card in slot 1 behind (seen on both testbed controllers, 2026-10-16); the next
+     * load then keeps it and appends the rest after it, which costs a second wipe and reload.
+     * Tries up to WIPE_TRIES times. Backported from V2.
+     * @param callable $delete_all runs `delete-all` on this controller and returns its output
+     * @param string   $log_prefix start of each log line, such as 'SYNC RECOVERY'
+     * @return bool false if cards were still there after the last try (the load goes ahead)
+     */
+    public static function wipe_cards($device_id, callable $delete_all, $log_prefix) {
+        for ($try = 1; $try <= self::WIPE_TRIES; $try++) {
+            $clean_wipe = trim(preg_replace('/\s+/', ' ', (string)$delete_all()));
+            if (empty($clean_wipe) || strpos($clean_wipe, 'ERROR') !== false) {
+                error_log("{$log_prefix} WARNING: delete-all for {$device_id} may have failed: {$clean_wipe}");
+            } else {
+                error_log("{$log_prefix}: delete-all output for {$device_id}: {$clean_wipe}");
+            }
+
+            // Settle delay for SPI flash sector erase
+            error_log("{$log_prefix}: Pausing " . self::WIPE_SETTLE . " seconds for controller flash erase to settle...");
+            sleep(self::WIPE_SETTLE);
+
+            $left = self::count_cards($device_id, $log_prefix);
+            if ($left === null || $left === 0) {
+                return true; // empty, or couldn't be checked (count_cards logged why)
+            }
+            error_log("{$log_prefix} WARNING: {$left} card(s) still on {$device_id} after delete-all (try {$try}/" . self::WIPE_TRIES . ")"
+                . ($try < self::WIPE_TRIES ? '; wiping again.' : '; going ahead with the load.'));
         }
+        return false;
+    }
 
-        // Settle delay for SPI flash sector erase
-        error_log("SYNC RECOVERY: Pausing 4 seconds for controller flash erase to settle...");
-        sleep(4);
+    /**
+     * The number of cards on a controller, read with the card loader's --count, or null if it
+     * couldn't be read. If any are found, the loader's output (each card and its slot, when
+     * there are only a few) goes to the log.
+     */
+    public static function count_cards($device_id, $log_prefix) {
+        if (!is_executable(self::LOADER)) {
+            error_log("{$log_prefix}: " . self::LOADER . " is not installed; not checking that {$device_id} is empty.");
+            return null;
+        }
+        $cmd = sprintf('timeout %d %s --config %s --count %s 2>&1',
+            self::COUNT_TIMEOUT, escapeshellarg(self::LOADER), escapeshellarg(self::CLI_CONFIG), escapeshellarg($device_id));
+        $lines = [];
+        exec($cmd, $lines, $exit_code);
+        $clean = trim(preg_replace('/\s+/', ' ', implode("\n", $lines)));
+        if ($exit_code !== 0 || !preg_match('/cards:(\d+)/', $clean, $m)) {
+            error_log("{$log_prefix} WARNING: could not read the card count of {$device_id} (exit {$exit_code}): {$clean}");
+            return null;
+        }
+        if ((int)$m[1] > 0) {
+            error_log("{$log_prefix}: card count of {$device_id}: {$clean}");
+        }
+        return (int)$m[1];
     }
 
     /**
