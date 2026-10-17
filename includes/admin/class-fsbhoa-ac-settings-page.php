@@ -432,7 +432,7 @@ class Fsbhoa_Ac_Settings_Page {
                         </th>
                         <td>
                             <input name="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::OPTION_NAME); ?>" type="number" id="fsbhoa_ac_vehicle_photo_retention_days" value="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::get_days()); ?>" min="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::MIN_DAYS); ?>" max="<?php echo esc_attr(Fsbhoa_Vehicle_Log_Retention::MAX_DAYS); ?>" class="small-text" />
-                            <p class="description">Plate and scene photos older than this are deleted each night. The vehicle log entries themselves are kept.</p>
+                            <p class="description">Plate and scene photos older than this are deleted each night (default 14). The vehicle log entries themselves are kept. Each vehicle read stores about 100 to 150 KB of photos, so busy gates can use 100 MB a day.</p>
                         </td>
                     </tr>
                     <?php endif; ?>

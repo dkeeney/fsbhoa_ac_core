@@ -19,7 +19,7 @@ class Fsbhoa_Vehicle_Log_Retention {
 
     const CRON_HOOK    = 'fsbhoa_vehicle_log_purge_photos';
     const OPTION_NAME  = 'fsbhoa_ac_vehicle_photo_retention_days';
-    const DEFAULT_DAYS = 90;
+    const DEFAULT_DAYS = 14;
     const MIN_DAYS     = 1;
     const MAX_DAYS     = 730;
     const RUN_TIME     = '03:05';
