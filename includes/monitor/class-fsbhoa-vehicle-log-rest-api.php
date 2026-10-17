@@ -13,6 +13,7 @@
  *   event_timestamp    local time (site time zone) of the first input,
  *                      "YYYY-MM-DD HH:MM:SS[.ffffff]"; defaults to the time of the post
  *   gate_identifier    the lane or gate name shown on the monitor
+ *   direction          'entry' (default) or 'exit': which way the lane goes
  *   auth_id            credential value or PIN presented at the gate
  *   auth_type          its ac_credentials.credential_type (e.g. DK_WINDSHIELD, DK_ENTRY_CODE)
  *   lpr_plate          plate text
@@ -137,6 +138,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
         $data = array(
             'event_timestamp'    => $timestamp,
             'gate_identifier'    => sanitize_text_field( $params['gate_identifier'] ?? '' ),
+            'direction'          => ( 'exit' === ( $params['direction'] ?? '' ) ) ? 'exit' : 'entry',
             'auth_id'            => sanitize_text_field( $params['auth_id'] ?? '' ),
             'auth_type'          => sanitize_text_field( $params['auth_type'] ?? '' ),
             'lpr_plate_string'   => sanitize_text_field( $params['lpr_plate'] ?? '' ),
@@ -148,7 +150,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'event_uid'          => '' !== $event_uid ? $event_uid : null,
         );
 
-        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s' );
+        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s' );
         $inserted = $wpdb->insert( $table, $data, $formats );
 
         if ( false === $inserted ) {
@@ -204,6 +206,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 vl.vehicle_log_id,
                 vl.event_timestamp,
                 vl.gate_identifier,
+                vl.direction,
                 vl.auth_id,
                 vl.auth_type,
                 vl.lpr_plate_string,

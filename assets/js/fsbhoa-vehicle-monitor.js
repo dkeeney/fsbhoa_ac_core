@@ -40,9 +40,12 @@
            li.dataset.logId = logId;
 
            const isCircumvention = parseInt(event.is_circumvention, 10) === 1;
+           const isExit = event.direction === 'exit';
            const borderStyle = isCircumvention
                ? 'border-left: 4px solid #ef4444; background: #fef2f2;'
-               : 'border-left: 4px solid #3b82f6; background: #eff6ff;';
+               : (isExit
+                   ? 'border-left: 4px solid #94a3b8; background: #f8fafc;'
+                   : 'border-left: 4px solid #3b82f6; background: #eff6ff;');
 
            const plate = event.lpr_plate_string || 'NO PLATE';
            const gate = event.gate_identifier || 'Vehicle Gate';
@@ -51,9 +54,14 @@
                DK_ENTRY_CODE: 'Gate Code #',
                DK_DIR_CODE: 'DIR: '
            };
+           // No credential and no circumvention: an event from a camera alone (a plate read
+           // not matched with a credential, or an exit), so there is nothing to say.
            const auth = event.auth_id
                ? ((authPrefixes[event.auth_type] || 'Auth: ') + event.auth_id)
-               : (isCircumvention ? 'NO CREDENTIAL' : 'No PIN/Card');
+               : (isCircumvention ? 'NO CREDENTIAL' : '');
+           const exitBadge = isExit
+               ? ' <span style="font-size: 10px; font-weight: bold; color: #475569; background: #e2e8f0; padding: 1px 6px; border-radius: 4px; margin-left: 4px;">EXIT</span>'
+               : '';
            const time = formatTime(event.event_timestamp);
 
            const lprUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=lpr' + nonceParam;
@@ -105,7 +113,8 @@
                     '<time style="font-size: 12px; color: #64748b; font-family: monospace;">' + esc(time) + '</time>' +
                   '</div>' +
                   '<div style="font-size: 13px; color: #334155; margin-top: 4px; font-weight: 500;">' +
-                    esc(gate) + ' &#x2022; <span style="color: #64748b;">' + esc(auth) + '</span>' +
+                    esc(gate) + exitBadge +
+                    (auth ? ' &#x2022; <span style="color: #64748b;">' + esc(auth) + '</span>' : '') +
                   '</div>' +
                   cardholderHtml +
                   warnBanner +

@@ -361,6 +361,7 @@ class Fsbhoa_Core_Repository {
             `vehicle_log_id` int NOT NULL AUTO_INCREMENT,
             `event_timestamp` datetime(3) NOT NULL COMMENT 'Local time (site time zone) of the first input',
             `gate_identifier` varchar(50) NOT NULL,
+            `direction` enum('entry','exit') NOT NULL DEFAULT 'entry' COMMENT 'entry or exit lane',
             `auth_id` varchar(50) DEFAULT NULL COMMENT 'Credential value or PIN presented at gate',
             `auth_type` varchar(32) DEFAULT NULL COMMENT 'Credential type for auth_id',
             `lpr_plate_string` varchar(20) DEFAULT NULL,
