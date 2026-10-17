@@ -206,7 +206,9 @@ class Fsbhoa_Shortcodes {
 
             // Vehicle column: polls /vehicle-recent; only when a vehicle hardware plugin turns it on
             if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) {
-                wp_enqueue_script('fsbhoa-vehicle-monitor-js', FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-vehicle-monitor.js', [], FSBHOA_AC_PLUGIN_VERSION, true);
+                // Versioned by the file's time, so browsers fetch it again whenever it changes
+                $vehicle_js = 'assets/js/fsbhoa-vehicle-monitor.js';
+                wp_enqueue_script('fsbhoa-vehicle-monitor-js', FSBHOA_AC_PLUGIN_URL . $vehicle_js, [], (string) filemtime(FSBHOA_AC_PLUGIN_DIR . $vehicle_js), true);
                 // The vehicle routes require a logged-in admin; WordPress needs the nonce to recognize the user.
                 wp_localize_script('fsbhoa-vehicle-monitor-js', 'fsbhoa_vehicle_vars', [ 'nonce' => wp_create_nonce('wp_rest') ]);
             }

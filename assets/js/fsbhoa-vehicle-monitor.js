@@ -59,7 +59,8 @@
            const auth = event.auth_id
                ? ((authPrefixes[event.auth_type] || 'Auth: ') + event.auth_id)
                : (isCircumvention ? 'NO CREDENTIAL' : '');
-           const exitBadge = isExit
+           // Unless the lane's name already says so ("South Exit")
+           const exitBadge = isExit && !/exit/i.test(gate)
                ? ' <span style="font-size: 10px; font-weight: bold; color: #475569; background: #e2e8f0; padding: 1px 6px; border-radius: 4px; margin-left: 4px;">EXIT</span>'
                : '';
            const time = formatTime(event.event_timestamp);
