@@ -376,6 +376,8 @@ class Fsbhoa_Core_Repository {
             `alert_key` varchar(32) DEFAULT NULL COMMENT 'A lane alert''s kind (such as arm_broken); NULL for a vehicle',
             `alert_text` varchar(100) DEFAULT NULL COMMENT 'What the monitor shows for the alert',
             `alert_active` tinyint(1) DEFAULT NULL COMMENT '1 when the alert starts, 0 when it ends',
+            `alert_ack_at` datetime DEFAULT NULL COMMENT 'When staff acknowledged the alert',
+            `alert_ack_by` varchar(60) DEFAULT NULL COMMENT 'Who acknowledged it',
             PRIMARY KEY (`vehicle_log_id`),
             UNIQUE KEY `uniq_event_uid` (`event_uid`),
             KEY `idx_timestamp_gate` (`event_timestamp`, `gate_identifier`),

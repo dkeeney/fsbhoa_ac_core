@@ -59,8 +59,15 @@
                     '<time style="font-size: 12px; color: #64748b; font-family: monospace;">' + esc(formatTime(event.event_timestamp)) + '</time>' +
                   '</div>' +
                   '<div style="font-size: 13px; color: #334155; margin-top: 4px; font-weight: 500;">' + esc(gate) + '</div>' +
+                  '<div class="fsbhoa-alert-ack" style="font-size: 12px; color: #64748b; margin-top: 4px;">' + ackNote(event) + '</div>' +
                '</div>';
            return li;
+        }
+
+        function ackNote(event) {
+           return event.alert_ack_at
+               ? 'Acknowledged by ' + esc(event.alert_ack_by || 'staff') + ' at ' + esc(formatTime(event.alert_ack_at))
+               : '';
         }
 
         function createCard(event) {
@@ -203,17 +210,10 @@
         }
 
         // ---- Lane alerts (such as a broken arm): a red banner across the top of the page and
-        // a sound, for as long as the alert is on. Silence stops the sound for that alert on
-        // this screen; the banner stays until the alert ends.
+        // a sound, on every screen, until someone acknowledges the alert (staff have seen it
+        // and called for repair) or it ends.
         const banner = document.getElementById('vehicle-alert-banner');
-        const silenceKey = 'fsbhoa_vehicle_alerts_silenced';
         let activeAlerts = [];
-        let silenced = {};
-        try { silenced = JSON.parse(localStorage.getItem(silenceKey) || '{}') || {}; } catch (e) { silenced = {}; }
-
-        function saveSilenced() {
-           try { localStorage.setItem(silenceKey, JSON.stringify(silenced)); } catch (e) { /* the sound comes back on reload */ }
-        }
 
         // The sound is made in the browser. A browser plays it only after someone has clicked
         // or pressed a key on the page, so the banner asks for a click until then.
@@ -268,7 +268,6 @@
            banner.innerHTML = activeAlerts.map(function(a) {
               const id = parseInt(a.vehicle_log_id, 10);
               const photoUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + id + '?type=overview' + nonceParam;
-              const quiet = !!silenced[id];
               return '<div style="display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #dc2626; color: #fff; font-size: 20px; font-weight: bold; border-bottom: 2px solid #7f1d1d; animation: fsbhoa-alert-pulse 1s ease-in-out infinite alternate;">' +
                    '<span style="font-size: 28px;">&#9888;</span>' +
                    '<span style="flex: 1;">' + esc(a.gate_identifier) + ': ' + esc(a.alert_text || a.alert_key) +
@@ -276,9 +275,7 @@
                    (isTrue(a.has_overview_img)
                       ? '<button type="button" onclick="openVehicleScene(\'' + photoUrl + '\')" style="background: #fff; color: #991b1b; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: bold; cursor: pointer;">View photo</button>'
                       : '') +
-                   (quiet
-                      ? '<span style="font-size: 14px; font-weight: normal;">Sound silenced</span>'
-                      : '<button type="button" data-silence="' + id + '" style="background: #7f1d1d; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: bold; cursor: pointer;">Silence</button>') +
+                   '<button type="button" data-ack="' + id + '" style="background: #7f1d1d; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: bold; cursor: pointer;" title="Stops the banner and the sound on every screen">Acknowledge</button>' +
                  '</div>';
            }).join('') +
            (muted
@@ -291,12 +288,25 @@
            const style = document.createElement('style');
            style.textContent = '@keyframes fsbhoa-alert-pulse { from { background-color: #dc2626; } to { background-color: #991b1b; } }';
            document.head.appendChild(style);
-           banner.addEventListener('click', function(e) {
-              const id = e.target && e.target.getAttribute('data-silence');
+           banner.addEventListener('click', async function(e) {
+              const id = e.target && e.target.getAttribute('data-ack');
               if (!id) return;
-              silenced[id] = true;
-              saveSilenced();
-              renderBanner();
+              e.target.disabled = true;
+              try {
+                 const resp = await fetch('/wp-json/fsbhoa/v1/vehicle-alerts/' + encodeURIComponent(id) + '/ack', {
+                    method: 'POST',
+                    headers: { 'X-WP-Nonce': nonce }
+                 });
+                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                 const ack = await resp.json();
+                 activeAlerts = activeAlerts.filter(function(a) { return String(a.vehicle_log_id) !== id; });
+                 renderBanner();
+                 const note = vehicleEventList.querySelector('li[data-log-id="' + parseInt(id, 10) + '"] .fsbhoa-alert-ack');
+                 if (note) note.innerHTML = ackNote(ack);
+              } catch (err) {
+                 e.target.disabled = false;
+                 console.warn('Vehicle alert acknowledgment failed:', err);
+              }
            });
         }
 
@@ -308,20 +318,15 @@
               const alerts = await resp.json();
               if (!Array.isArray(alerts)) return;
               activeAlerts = alerts;
-              // Forget silenced alerts that have ended
-              const on = {};
-              alerts.forEach(function(a) { on[parseInt(a.vehicle_log_id, 10)] = true; });
-              Object.keys(silenced).forEach(function(id) { if (!on[id]) delete silenced[id]; });
-              saveSilenced();
               renderBanner();
            } catch (err) {
               console.warn('Vehicle alert fetch error:', err);
            }
         }
 
-        // The sound repeats every 15 seconds while an alert is on and not silenced
+        // The sound repeats every 15 seconds while an alert is on and not acknowledged
         setInterval(function() {
-           if (activeAlerts.some(function(a) { return !silenced[parseInt(a.vehicle_log_id, 10)]; })) playAlarm();
+           if (activeAlerts.length > 0) playAlarm();
         }, 15000);
 
         window.openVehicleScene = function(src) {
@@ -336,14 +341,14 @@
         fetchRecent();
         setInterval(fetchRecent, 3000);
         fetchAlerts().then(function() {
-           if (activeAlerts.some(function(a) { return !silenced[parseInt(a.vehicle_log_id, 10)]; })) playAlarm();
+           if (activeAlerts.length > 0) playAlarm();
         });
         setInterval(function() {
            const before = {};
            activeAlerts.forEach(function(a) { before[a.vehicle_log_id] = true; });
            fetchAlerts().then(function() {
               // A new alert sounds at once
-              if (activeAlerts.some(function(a) { return !before[a.vehicle_log_id] && !silenced[parseInt(a.vehicle_log_id, 10)]; })) playAlarm();
+              if (activeAlerts.some(function(a) { return !before[a.vehicle_log_id]; })) playAlarm();
            });
         }, 3000);
     });

@@ -364,7 +364,9 @@ CREATE TABLE `ac_vehicle_log` (
   `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice',
   `alert_key` varchar(32) DEFAULT NULL COMMENT 'A lane alert''s kind (such as arm_broken); NULL for a vehicle',
   `alert_text` varchar(100) DEFAULT NULL COMMENT 'What the monitor shows for the alert',
-  `alert_active` tinyint(1) DEFAULT NULL COMMENT '1 when the alert starts, 0 when it ends'
+  `alert_active` tinyint(1) DEFAULT NULL COMMENT '1 when the alert starts, 0 when it ends',
+  `alert_ack_at` datetime DEFAULT NULL COMMENT 'When staff acknowledged the alert',
+  `alert_ack_by` varchar(60) DEFAULT NULL COMMENT 'Who acknowledged it'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --

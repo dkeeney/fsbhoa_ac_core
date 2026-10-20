@@ -30,10 +30,12 @@
  * Replies { success, vehicle_log_id[, duplicate] }. 409 for the other environment's event,
  * 503 when this server's environment isn't set.
  *
- * GET /vehicle-recent[?since=<vehicle_log_id>], GET /vehicle-image/<id>?type=lpr|context|overview
- * and GET /vehicle-alerts (the lane alerts now on: each lane and kind whose latest row has
- * alert_active 1) are for the monitor page (logged-in admin, X-WP-Nonce or _wpnonce). The
- * monitor shows an alert that is on as a red banner, with a sound, until its end arrives.
+ * GET /vehicle-recent[?since=<vehicle_log_id>], GET /vehicle-image/<id>?type=lpr|context|overview,
+ * GET /vehicle-alerts (the lane alerts now on that nobody has acknowledged: each lane and kind
+ * whose latest row has alert_active 1 and no alert_ack_at) and POST /vehicle-alerts/<id>/ack
+ * (staff saw it: records who and when) are for the monitor page (logged-in admin, X-WP-Nonce
+ * or _wpnonce). The monitor shows each alert from /vehicle-alerts as a red banner with a
+ * sound, on every screen, until someone acknowledges it or it ends.
  *
  * @package Fsbhoa_Ac
  */
@@ -82,6 +84,13 @@ class Fsbhoa_Vehicle_Log_REST_API {
         register_rest_route( $this->namespace, '/vehicle-alerts', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_active_alerts' ),
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
+        ) );
+
+        // Staff acknowledge an alert: its banner and sound stop on every screen
+        register_rest_route( $this->namespace, '/vehicle-alerts/(?P<id>\d+)/ack', array(
+            'methods'             => 'POST',
+            'callback'            => array( $this, 'acknowledge_alert' ),
             'permission_callback' => array( $this, 'monitor_user_permission_check' ),
         ) );
     }
@@ -252,6 +261,8 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 vl.alert_key,
                 vl.alert_text,
                 vl.alert_active,
+                vl.alert_ack_at,
+                vl.alert_ack_by,
                 (vl.context_image_data IS NOT NULL) AS has_context_img,
                 (vl.lpr_image_data IS NOT NULL) AS has_lpr_img,
                 (vl.overview_image_data IS NOT NULL) AS has_overview_img,
@@ -329,8 +340,8 @@ class Fsbhoa_Vehicle_Log_REST_API {
     }
 
     /**
-     * The lane alerts that are on: for each lane and alert kind, its latest row, when that
-     * row started the alert. Oldest first.
+     * The lane alerts that are on and not acknowledged: for each lane and alert kind, its
+     * latest row, when that row started the alert and nobody has acknowledged it. Oldest first.
      */
     public function get_active_alerts( WP_REST_Request $request ) {
         global $wpdb;
@@ -345,6 +356,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
                        WHERE alert_key IS NOT NULL
                        GROUP BY gate_identifier, alert_key ) latest ON latest.id = vl.vehicle_log_id
               WHERE vl.alert_active = 1
+                AND vl.alert_ack_at IS NULL
               ORDER BY vl.vehicle_log_id ASC",
             ARRAY_A
         );
@@ -355,5 +367,35 @@ class Fsbhoa_Vehicle_Log_REST_API {
         }
 
         return rest_ensure_response( ! empty( $results ) ? $results : array() );
+    }
+
+    /**
+     * Record that staff acknowledged an alert (the first acknowledgment counts).
+     */
+    public function acknowledge_alert( WP_REST_Request $request ) {
+        global $wpdb;
+        $table  = self::TABLE;
+        $log_id = absint( $request['id'] );
+        $user   = wp_get_current_user();
+        $by     = mb_substr( $user->display_name ? $user->display_name : $user->user_login, 0, 60 );
+        $now    = current_time( 'mysql' );
+
+        $updated = $wpdb->query( $wpdb->prepare(
+            "UPDATE {$table} SET alert_ack_at = %s, alert_ack_by = %s
+              WHERE vehicle_log_id = %d AND alert_key IS NOT NULL AND alert_ack_at IS NULL",
+            $now, $by, $log_id
+        ) );
+        if ( false === $updated ) {
+            error_log( 'FSBHOA Vehicle Log: alert acknowledgment failed: ' . $wpdb->last_error );
+            return new WP_Error( 'db_error', 'Could not acknowledge the alert', array( 'status' => 500 ) );
+        }
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT alert_ack_at, alert_ack_by FROM {$table} WHERE vehicle_log_id = %d AND alert_key IS NOT NULL",
+            $log_id
+        ), ARRAY_A );
+        if ( ! $row ) {
+            return new WP_Error( 'not_found', 'No such alert', array( 'status' => 404 ) );
+        }
+        return rest_ensure_response( array( 'success' => true ) + $row );
     }
 }
