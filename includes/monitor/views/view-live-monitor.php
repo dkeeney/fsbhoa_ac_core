@@ -91,7 +91,7 @@ function fsbhoa_render_live_monitor_view() {
                 <div id="vehicle-log-column">
                     <h2 class="text-xl font-semibold mb-4" style="display: flex; justify-content: space-between; align-items: center;">
                         <span>Vehicle Gate Traffic</span>
-                        <button type="button" id="vehicle-alert-test-sound" title="Play the alert sound, to check the speakers (this also turns the sound on for this page)" style="font-size: 13px; font-weight: normal; padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer;">&#128276; Test sound</button>
+                        <button type="button" id="vehicle-alert-test-sound" title="Play the alert sound, to check the speakers (this also turns the sound on for this page)" style="font-size: 13px; font-weight: normal; padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #1f2937; cursor: pointer;">&#128276; Test sound</button>
                     </h2>
                     <!-- Lane alerts that are on, such as a broken arm (/vehicle-alerts; filled by fsbhoa-vehicle-monitor.js) -->
                     <ul id="vehicle-alert-list" role="alert" style="list-style: none; margin: 0; padding: 0;"></ul>

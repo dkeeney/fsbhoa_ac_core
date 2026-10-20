@@ -286,7 +286,8 @@
            testSound.textContent = problem
                ? '\u{1F507} No sound: ' + problem
                : (soundAllowed ? '\u{1F514} Test sound' : '\u{1F514} Turn on alert sound');
-           testSound.style.background = soundAllowed || problem ? '#fff' : '#fef3c7';
+           testSound.style.background = soundAllowed || problem ? '#fff' : '#fde68a';
+           testSound.style.color = problem ? '#991b1b' : '#1f2937'; // the theme makes button text white
         }
         if (testSound) {
            showSoundState('');
