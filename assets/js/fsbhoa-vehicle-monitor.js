@@ -67,25 +67,36 @@
 
            const lprUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=lpr' + nonceParam;
            const contextUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=context' + nonceParam;
+           const overviewUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=overview' + nonceParam;
            const hasLpr = isTrue(event.has_lpr_img);
            const hasContext = isTrue(event.has_context_img);
+           const hasOverview = isTrue(event.has_overview_img);
 
            let warnBanner = '';
            if (isCircumvention) {
                warnBanner = '<div style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-top: 4px; display: inline-block;">&#9888; Gate Tripped Without Auth</div>';
            }
 
-           // Thumbnail is the plate crop when there is one; clicking opens the scene photo
-           // when there is one. With only one image, that image is used for both.
-           let imgBox = '';
-           if (hasLpr || hasContext) {
-               const thumbUrl = hasLpr ? lprUrl : contextUrl;
-               const fullUrl = hasContext ? contextUrl : lprUrl;
-               imgBox = '<div style="flex-shrink: 0; cursor: pointer; text-align: center;" onclick="openVehicleScene(\'' + fullUrl + '\')" title="' + (hasContext ? 'Click to view full context scene' : 'Click to enlarge plate') + '">' +
-                  '<img src="' + thumbUrl + '" alt="' + esc(plate) + '" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; background: #e2e8f0;" onerror="this.style.display=\'none\';">' +
-                 '<div style="font-size: 9px; color: #64748b; margin-top: 2px;">Expand</div>' +
+           // One thumbnail that opens its full photo in the lightbox.
+           function thumb(thumbUrl, fullUrl, alt, title, caption) {
+               return '<div style="cursor: pointer; text-align: center;" onclick="openVehicleScene(\'' + fullUrl + '\')" title="' + title + '">' +
+                  '<img src="' + thumbUrl + '" alt="' + esc(alt) + '" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; background: #e2e8f0;" onerror="this.style.display=\'none\';">' +
+                 '<div style="font-size: 9px; color: #64748b; margin-top: 2px;">' + caption + '</div>' +
                '</div>';
            }
+
+           // The first thumbnail is the plate crop when there is one; clicking opens the
+           // scene photo when there is one. With only one of the two, it is used for both.
+           // The second is the overview camera's photo of the car at the gate.
+           let thumbs = '';
+           if (hasLpr || hasContext) {
+               thumbs += thumb(hasLpr ? lprUrl : contextUrl, hasContext ? contextUrl : lprUrl, plate,
+                   hasContext ? 'Click to view full context scene' : 'Click to enlarge plate', 'Plate');
+           }
+           if (hasOverview) {
+               thumbs += thumb(overviewUrl, overviewUrl, gate, 'Click to view the overview camera\'s photo', 'Gate');
+           }
+           const imgBox = thumbs ? '<div style="flex-shrink: 0; display: flex; gap: 6px;">' + thumbs + '</div>' : '';
 
            // When a credential value belongs to more than one person (such as a shared
            // household PIN), the server picks one; say how many others there are.

@@ -134,7 +134,7 @@ function fsbhoa_render_live_monitor_view() {
             </div>
         </div>
         <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
-        <!-- Lightbox Modal for a vehicle's plate or scene photo (opened by openVehicleScene()) -->
+        <!-- Lightbox Modal for a vehicle's plate, scene or overview photo (opened by openVehicleScene()) -->
         <div id="fsbhoa-vehicle-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 20px;" onclick="this.style.display='none';">
             <div style="max-width: 90vw; max-height: 90vh; text-align: center;" onclick="event.stopPropagation();">
                 <img id="fsbhoa-modal-img" src="" alt="Full Scene" style="max-width: 100%; max-height: 80vh; border-radius: 8px;">

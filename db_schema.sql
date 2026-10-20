@@ -358,6 +358,7 @@ CREATE TABLE `ac_vehicle_log` (
   `is_circumvention` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 if the vehicle passed without auth',
   `context_image_data` mediumblob DEFAULT NULL,
   `lpr_image_data` mediumblob DEFAULT NULL,
+  `overview_image_data` mediumblob DEFAULT NULL COMMENT 'Photo of the vehicle from the lane overview camera',
   `raw_details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Hardware inputs and timings, as sent by the vehicle service' CHECK (json_valid(`raw_details`)),
   `created_at` datetime DEFAULT current_timestamp(),
   `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice'

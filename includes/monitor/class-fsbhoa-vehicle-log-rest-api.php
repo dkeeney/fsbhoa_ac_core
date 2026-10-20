@@ -21,11 +21,12 @@
  *   is_circumvention   true if the vehicle passed without a credential
  *   lpr_image_b64      plate photo, base64 JPEG
  *   context_image_b64  scene photo, base64 JPEG
+ *   overview_image_b64 the lane overview camera's photo of the vehicle, base64 JPEG
  *   raw_details        any JSON object: the sender's inputs and timings
  * Replies { success, vehicle_log_id[, duplicate] }. 409 for the other environment's event,
  * 503 when this server's environment isn't set.
  *
- * GET /vehicle-recent[?since=<vehicle_log_id>] and GET /vehicle-image/<id>?type=lpr|context
+ * GET /vehicle-recent[?since=<vehicle_log_id>] and GET /vehicle-image/<id>?type=lpr|context|overview
  * are for the monitor page (logged-in admin, X-WP-Nonce or _wpnonce).
  *
  * @package Fsbhoa_Ac
@@ -118,8 +119,9 @@ class Fsbhoa_Vehicle_Log_REST_API {
             }
         }
 
-        $context_blob = ! empty( $params['context_image_b64'] ) ? base64_decode( $params['context_image_b64'] ) : null;
-        $lpr_blob     = ! empty( $params['lpr_image_b64'] ) ? base64_decode( $params['lpr_image_b64'] ) : null;
+        $context_blob  = ! empty( $params['context_image_b64'] ) ? base64_decode( $params['context_image_b64'] ) : null;
+        $lpr_blob      = ! empty( $params['lpr_image_b64'] ) ? base64_decode( $params['lpr_image_b64'] ) : null;
+        $overview_blob = ! empty( $params['overview_image_b64'] ) ? base64_decode( $params['overview_image_b64'] ) : null;
 
         // event_timestamp is local time (site time zone), like ac_access_log.
         $timestamp = current_time( 'mysql' );
@@ -146,11 +148,12 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'is_circumvention'   => ! empty( $params['is_circumvention'] ) ? 1 : 0,
             'context_image_data' => $context_blob,
             'lpr_image_data'     => $lpr_blob,
+            'overview_image_data' => $overview_blob,
             'raw_details'        => $raw_details,
             'event_uid'          => '' !== $event_uid ? $event_uid : null,
         );
 
-        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s' );
+        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s' );
         $inserted = $wpdb->insert( $table, $data, $formats );
 
         if ( false === $inserted ) {
@@ -165,14 +168,19 @@ class Fsbhoa_Vehicle_Log_REST_API {
     }
 
     /**
-     * Send a stored photo as JPEG: ?type=lpr for the plate, anything else for the scene.
+     * Send a stored photo as JPEG: ?type=lpr for the plate, ?type=overview for the overview
+     * camera's photo, anything else for the scene.
      */
     public function serve_image( WP_REST_Request $request ) {
         global $wpdb;
         $log_id = absint( $request['id'] );
         $type   = $request->get_param( 'type' );
 
-        $column = ( 'lpr' === $type ) ? 'lpr_image_data' : 'context_image_data';
+        $columns = array(
+            'lpr'      => 'lpr_image_data',
+            'overview' => 'overview_image_data',
+        );
+        $column  = $columns[ $type ] ?? 'context_image_data';
         $table  = self::TABLE;
 
         $image_data = $wpdb->get_var( $wpdb->prepare(
@@ -214,6 +222,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 vl.is_circumvention,
                 (vl.context_image_data IS NOT NULL) AS has_context_img,
                 (vl.lpr_image_data IS NOT NULL) AS has_lpr_img,
+                (vl.overview_image_data IS NOT NULL) AS has_overview_img,
                 COALESCE(
                     CASE WHEN vl.auth_type = 'DK_WINDSHIELD' THEN NULLIF(h.primary_cardholder_id, 0) END,
                     NULLIF(cred.cardholder_id, 0),

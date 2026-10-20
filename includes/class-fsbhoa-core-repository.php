@@ -369,6 +369,7 @@ class Fsbhoa_Core_Repository {
             `is_circumvention` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 if the vehicle passed without auth',
             `context_image_data` mediumblob DEFAULT NULL,
             `lpr_image_data` mediumblob DEFAULT NULL,
+            `overview_image_data` mediumblob DEFAULT NULL COMMENT 'Photo of the vehicle from the lane overview camera',
             `raw_details` json DEFAULT NULL COMMENT 'Hardware inputs and timings, as sent by the vehicle service',
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice',
