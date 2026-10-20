@@ -241,7 +241,7 @@
                  if (tone) {
                     const into = inBeep < 0.22 ? inBeep : inBeep - 0.25;
                     const env = Math.min(1, into / 0.01, (0.22 - into) / 0.01); // no clicks
-                    sample = (Math.sin(2 * Math.PI * tone * t) >= 0 ? 1 : -1) * 0.8 * env;
+                    sample = (Math.sin(2 * Math.PI * tone * t) >= 0 ? 1 : -1) * 0.4 * env;
                  }
               }
               v.setInt16(44 + i * 2, Math.round(sample * 32767), true);
