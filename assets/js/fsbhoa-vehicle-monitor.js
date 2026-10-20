@@ -215,52 +215,63 @@
         const banner = document.getElementById('vehicle-alert-banner');
         let activeAlerts = [];
 
-        // The sound is made in the browser. A browser plays it only after someone has clicked
-        // or pressed a key on the page, so the banner asks for a click until then.
-        let audioCtx = null;
-        function audio() {
-           if (!audioCtx) {
-              const Ctx = window.AudioContext || window.webkitAudioContext;
-              if (!Ctx) return null;
-              audioCtx = new Ctx();
+        // The sound is made in the page: three rising two-tone beeps, about 2 seconds, as a
+        // WAV clip played like any other audio. A browser plays it only after someone has
+        // clicked or pressed a key on the page, so the banner asks for a click until then.
+        let alarmUrl = null;
+        let soundAllowed = false; // a play has worked on this page
+        function alarmClip() {
+           if (alarmUrl) return alarmUrl;
+           const rate = 22050;
+           const seconds = 2.2;
+           const n = Math.floor(rate * seconds);
+           const buf = new ArrayBuffer(44 + n * 2);
+           const v = new DataView(buf);
+           function str(o, t) { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); }
+           str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+           str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+           v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+           str(36, 'data'); v.setUint32(40, n * 2, true);
+           for (let i = 0; i < n; i++) {
+              const t = i / rate;
+              const inBeep = t % 0.7; // each beep pair: 880 Hz for 0.22 s, then 1320 Hz for 0.22 s
+              let sample = 0;
+              if (t < 2.1) {
+                 const tone = inBeep < 0.22 ? 880 : (inBeep >= 0.25 && inBeep < 0.47 ? 1320 : 0);
+                 if (tone) {
+                    const into = inBeep < 0.22 ? inBeep : inBeep - 0.25;
+                    const env = Math.min(1, into / 0.01, (0.22 - into) / 0.01); // no clicks
+                    sample = (Math.sin(2 * Math.PI * tone * t) >= 0 ? 1 : -1) * 0.8 * env;
+                 }
+              }
+              v.setInt16(44 + i * 2, Math.round(sample * 32767), true);
            }
-           return audioCtx;
+           alarmUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+           return alarmUrl;
         }
-        // A click that turns the sound on plays it at once if an alert is showing
-        function unlockAudio() {
-           const ctx = audio();
-           if (ctx && ctx.state === 'suspended') {
-              ctx.resume().then(function() {
-                 renderBanner();
-                 if (activeAlerts.length > 0) playAlarm();
-              }, function() {});
+
+        // Plays the alarm; resolves to '' when it played, or the browser's reason when not
+        function playAlarm() {
+           try {
+              const clip = new Audio(alarmClip());
+              clip.volume = 1;
+              return clip.play().then(function() {
+                 if (!soundAllowed) { soundAllowed = true; renderBanner(); }
+                 return '';
+              }, function(err) {
+                 return (err && (err.name + ': ' + err.message)) || 'refused';
+              });
+           } catch (err) {
+              return Promise.resolve(String(err));
            }
+        }
+
+        // A click or key press lets the page play sound: play at once if an alert is showing
+        function unlockAudio() {
+           if (!soundAllowed && activeAlerts.length > 0) playAlarm();
         }
         document.addEventListener('click', unlockAudio);
         document.addEventListener('keydown', unlockAudio);
-
-        // Three rising two-tone beeps, about 2 seconds
-        function playAlarm() {
-           const ctx = audio();
-           if (!ctx || ctx.state !== 'running') return;
-           const start = ctx.currentTime + 0.05;
-           for (let i = 0; i < 3; i++) {
-              [[880, 0], [1320, 0.25]].forEach(function(tone) {
-                 const t = start + i * 0.7 + tone[1];
-                 const osc = ctx.createOscillator();
-                 const gain = ctx.createGain();
-                 osc.type = 'square';
-                 osc.frequency.value = tone[0];
-                 gain.gain.setValueAtTime(0.0001, t);
-                 gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-                 gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
-                 osc.connect(gain);
-                 gain.connect(ctx.destination);
-                 osc.start(t);
-                 osc.stop(t + 0.25);
-              });
-           }
-        }
 
         function renderBanner() {
            if (!banner) return;
@@ -269,8 +280,7 @@
               banner.innerHTML = '';
               return;
            }
-           const ctx = audio();
-           const muted = !ctx || ctx.state !== 'running';
+           const muted = !soundAllowed;
            banner.innerHTML = activeAlerts.map(function(a) {
               const id = parseInt(a.vehicle_log_id, 10);
               const photoUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + id + '?type=overview' + nonceParam;
@@ -294,10 +304,12 @@
         // turns the sound on for this page
         const testSound = document.getElementById('vehicle-alert-test-sound');
         if (testSound) {
-           testSound.addEventListener('click', function() {
-              const ctx = audio();
-              if (!ctx) return;
-              ctx.resume().then(function() { renderBanner(); playAlarm(); }, function() {});
+           testSound.addEventListener('click', function(e) {
+              e.stopPropagation(); // one play, not a second from unlockAudio
+              playAlarm().then(function(problem) {
+                 testSound.title = problem ? 'The browser did not play it: ' + problem : 'Played';
+                 testSound.textContent = problem ? '\u{1F507} No sound: ' + problem : '\u{1F514} Test sound';
+              });
            });
         }
 
