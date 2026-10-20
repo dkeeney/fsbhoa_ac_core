@@ -209,15 +209,17 @@
            }
         }
 
-        // ---- Lane alerts (such as a broken arm): a red banner across the top of the page and
-        // a sound, on every screen, until someone acknowledges the alert (staff have seen it
-        // and called for repair) or it ends.
-        const banner = document.getElementById('vehicle-alert-banner');
+        // ---- Lane alerts (such as a broken arm). Each alert that is on and not acknowledged
+        // is a pulsing red card pinned at the top of the vehicle column, with Acknowledge, and
+        // sounds an alarm every 15 seconds; a new one also raises a desktop notification
+        // (clicking it brings the monitor forward) and flashes the tab's title. Acknowledge
+        // (staff have seen it and called for repair) stops all of it on every screen.
+        const alertList = document.getElementById('vehicle-alert-list');
         let activeAlerts = [];
 
         // The sound is made in the page: three rising two-tone beeps, about 2 seconds, as a
         // WAV clip played like any other audio. A browser plays it only after someone has
-        // clicked or pressed a key on the page, so the banner asks for a click until then.
+        // clicked or pressed a key on the page, so the page asks for a click until then.
         let alarmUrl = null;
         let soundAllowed = false; // a play has worked on this page
         function alarmClip() {
@@ -256,7 +258,7 @@
               const clip = new Audio(alarmClip());
               clip.volume = 1;
               return clip.play().then(function() {
-                 if (!soundAllowed) { soundAllowed = true; renderBanner(); }
+                 if (!soundAllowed) { soundAllowed = true; renderAlerts(); showSoundState(''); }
                  return '';
               }, function(err) {
                  return (err && (err.name + ': ' + err.message)) || 'refused';
@@ -273,51 +275,83 @@
         document.addEventListener('click', unlockAudio);
         document.addEventListener('keydown', unlockAudio);
 
-        function renderBanner() {
-           if (!banner) return;
-           if (activeAlerts.length === 0) {
-              banner.style.display = 'none';
-              banner.innerHTML = '';
-              return;
-           }
-           const muted = !soundAllowed;
-           banner.innerHTML = activeAlerts.map(function(a) {
-              const id = parseInt(a.vehicle_log_id, 10);
-              const photoUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + id + '?type=overview' + nonceParam;
-              return '<div style="display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #dc2626; color: #fff; font-size: 20px; font-weight: bold; border-bottom: 2px solid #7f1d1d; animation: fsbhoa-alert-pulse 1s ease-in-out infinite alternate;">' +
-                   '<span style="font-size: 28px;">&#9888;</span>' +
-                   '<span style="flex: 1;">' + esc(a.gate_identifier) + ': ' + esc(a.alert_text || a.alert_key) +
-                      ' <span style="font-weight: normal; font-size: 16px;">since ' + esc(formatTime(a.event_timestamp)) + '</span></span>' +
-                   (isTrue(a.has_overview_img)
-                      ? '<button type="button" onclick="openVehicleScene(\'' + photoUrl + '\')" style="background: #fff; color: #991b1b; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: bold; cursor: pointer;">View photo</button>'
-                      : '') +
-                   '<button type="button" data-ack="' + id + '" style="background: #7f1d1d; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; font-weight: bold; cursor: pointer;" title="Stops the banner and the sound on every screen">Acknowledge</button>' +
-                 '</div>';
-           }).join('') +
-           (muted
-              ? '<div style="background: #7f1d1d; color: #fff; padding: 4px 20px; font-size: 14px;">Click anywhere on this page to turn on the alert sound.</div>'
-              : '');
-           banner.style.display = 'block';
-        }
-
-        // "Test sound" next to the column's heading: staff check their speakers, and the click
-        // turns the sound on for this page
+        // The button by the column's heading: "Turn on alert sound" until a sound has played
+        // on this page, then "Test sound". Its click also asks to allow desktop notifications.
         const testSound = document.getElementById('vehicle-alert-test-sound');
+        function showSoundState(problem) {
+           if (!testSound) return;
+           testSound.title = problem
+               ? 'The browser did not play it: ' + problem
+               : 'Play the alert sound, to check the speakers';
+           testSound.textContent = problem
+               ? '\u{1F507} No sound: ' + problem
+               : (soundAllowed ? '\u{1F514} Test sound' : '\u{1F514} Turn on alert sound');
+           testSound.style.background = soundAllowed || problem ? '#fff' : '#fef3c7';
+        }
         if (testSound) {
+           showSoundState('');
            testSound.addEventListener('click', function(e) {
               e.stopPropagation(); // one play, not a second from unlockAudio
-              playAlarm().then(function(problem) {
-                 testSound.title = problem ? 'The browser did not play it: ' + problem : 'Played';
-                 testSound.textContent = problem ? '\u{1F507} No sound: ' + problem : '\u{1F514} Test sound';
-              });
+              if ('Notification' in window && Notification.permission === 'default') {
+                 Notification.requestPermission();
+              }
+              playAlarm().then(showSoundState);
            });
         }
 
-        if (banner) {
+        // A desktop notification for a new alert: it shows even when the browser is behind
+        // other windows, and clicking it brings the monitor forward.
+        function notify(a) {
+           try { window.focus(); } catch (e) { /* most browsers refuse; the notification is the way */ }
+           if (!('Notification' in window) || Notification.permission !== 'granted') return;
+           try {
+              const n = new Notification('⚠ ' + (a.gate_identifier || 'Vehicle gate') + ': ' + (a.alert_text || a.alert_key), {
+                 body: 'Since ' + formatTime(a.event_timestamp) + '. Open the live monitor to acknowledge.',
+                 tag: 'fsbhoa-vehicle-alert-' + a.vehicle_log_id,
+                 requireInteraction: true
+              });
+              n.onclick = function() { window.focus(); n.close(); };
+           } catch (e) {
+              console.warn('Vehicle alert notification failed:', e);
+           }
+        }
+
+        // The tab's title flashes while an alert is on
+        const pageTitle = document.title;
+        let titleFlip = false;
+        setInterval(function() {
+           if (activeAlerts.length === 0) {
+              if (document.title !== pageTitle) document.title = pageTitle;
+              return;
+           }
+           titleFlip = !titleFlip;
+           const a = activeAlerts[0];
+           document.title = titleFlip ? '⚠ ' + (a.alert_text || a.alert_key) + ' - ' + a.gate_identifier : pageTitle;
+        }, 1000);
+
+        function renderAlerts() {
+           if (!alertList) return;
+           alertList.innerHTML = '';
+           activeAlerts.forEach(function(a) {
+              const card = createAlertCard(Object.assign({}, a, { alert_active: 1 }));
+              card.style.animation = 'fsbhoa-alert-pulse 1s ease-in-out infinite alternate';
+              card.style.borderRadius = '8px';
+              card.style.marginBottom = '8px';
+              const box = card.lastChild;
+              box.insertAdjacentHTML('beforeend',
+                 '<div style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">' +
+                   '<button type="button" data-ack="' + parseInt(a.vehicle_log_id, 10) + '" style="background: #b91c1c; color: #fff; border: 0; border-radius: 6px; padding: 6px 14px; font-weight: bold; cursor: pointer;" title="Stops the alarm on every screen">Acknowledge</button>' +
+                   (soundAllowed ? '' : '<span style="font-size: 12px; color: #991b1b;">Click anywhere on this page to turn on the alarm sound.</span>') +
+                 '</div>');
+              alertList.appendChild(card);
+           });
+        }
+
+        if (alertList) {
            const style = document.createElement('style');
-           style.textContent = '@keyframes fsbhoa-alert-pulse { from { background-color: #dc2626; } to { background-color: #991b1b; } }';
+           style.textContent = '@keyframes fsbhoa-alert-pulse { from { background-color: #fee2e2; } to { background-color: #fca5a5; } }';
            document.head.appendChild(style);
-           banner.addEventListener('click', async function(e) {
+           alertList.addEventListener('click', async function(e) {
               const id = e.target && e.target.getAttribute('data-ack');
               if (!id) return;
               e.target.disabled = true;
@@ -329,7 +363,7 @@
                  if (!resp.ok) throw new Error('HTTP ' + resp.status);
                  const ack = await resp.json();
                  activeAlerts = activeAlerts.filter(function(a) { return String(a.vehicle_log_id) !== id; });
-                 renderBanner();
+                 renderAlerts();
                  const note = vehicleEventList.querySelector('li[data-log-id="' + parseInt(id, 10) + '"] .fsbhoa-alert-ack');
                  if (note) note.innerHTML = ackNote(ack);
               } catch (err) {
@@ -340,14 +374,16 @@
         }
 
         async function fetchAlerts() {
-           if (!banner) return;
+           if (!alertList) return;
            try {
               const resp = await fetch('/wp-json/fsbhoa/v1/vehicle-alerts', { headers: { 'X-WP-Nonce': nonce } });
               if (!resp.ok) return;
               const alerts = await resp.json();
               if (!Array.isArray(alerts)) return;
+              const changed = JSON.stringify(alerts.map(function(a) { return a.vehicle_log_id; })) !==
+                              JSON.stringify(activeAlerts.map(function(a) { return a.vehicle_log_id; }));
               activeAlerts = alerts;
-              renderBanner();
+              if (changed) renderAlerts();
            } catch (err) {
               console.warn('Vehicle alert fetch error:', err);
            }
@@ -376,8 +412,12 @@
            const before = {};
            activeAlerts.forEach(function(a) { before[a.vehicle_log_id] = true; });
            fetchAlerts().then(function() {
-              // A new alert sounds at once
-              if (activeAlerts.some(function(a) { return !before[a.vehicle_log_id]; })) playAlarm();
+              // A new alert sounds at once, notifies, and brings the column into view
+              const fresh = activeAlerts.filter(function(a) { return !before[a.vehicle_log_id]; });
+              if (fresh.length === 0) return;
+              playAlarm();
+              fresh.forEach(notify);
+              if (alertList) alertList.scrollIntoView({ block: 'start', behavior: 'smooth' });
            });
         }, 3000);
     });

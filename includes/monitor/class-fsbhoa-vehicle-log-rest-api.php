@@ -34,8 +34,9 @@
  * GET /vehicle-alerts (the lane alerts now on that nobody has acknowledged: each lane and kind
  * whose latest row has alert_active 1 and no alert_ack_at) and POST /vehicle-alerts/<id>/ack
  * (staff saw it: records who and when) are for the monitor page (logged-in admin, X-WP-Nonce
- * or _wpnonce). The monitor shows each alert from /vehicle-alerts as a red banner with a
- * sound, on every screen, until someone acknowledges it or it ends.
+ * or _wpnonce). The monitor shows each alert from /vehicle-alerts as a pulsing red card at
+ * the top of the vehicle column, with an alarm sound, a desktop notification and a flashing
+ * tab title, on every screen, until someone acknowledges it or it ends.
  *
  * @package Fsbhoa_Ac
  */

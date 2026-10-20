@@ -83,11 +83,6 @@ function fsbhoa_render_live_monitor_view() {
             </div>
        </div>
 
-       <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
-       <!-- Lane alerts that are on, such as a broken arm (/vehicle-alerts; filled by fsbhoa-vehicle-monitor.js) -->
-       <div id="vehicle-alert-banner" role="alert" style="display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;"></div>
-       <?php endif; ?>
-
        <div id="activity-log-section">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; max-width: 1400px; margin: 0 auto;">
 
@@ -98,6 +93,8 @@ function fsbhoa_render_live_monitor_view() {
                         <span>Vehicle Gate Traffic</span>
                         <button type="button" id="vehicle-alert-test-sound" title="Play the alert sound, to check the speakers (this also turns the sound on for this page)" style="font-size: 13px; font-weight: normal; padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer;">&#128276; Test sound</button>
                     </h2>
+                    <!-- Lane alerts that are on, such as a broken arm (/vehicle-alerts; filled by fsbhoa-vehicle-monitor.js) -->
+                    <ul id="vehicle-alert-list" role="alert" style="list-style: none; margin: 0; padding: 0;"></ul>
                     <div class="bg-white rounded-xl shadow-md overflow-hidden">
                         <div id="vehicle-log-container" style="height: 36rem; overflow-y: auto;">
                             <ul id="vehicle-event-list" class="divide-y divide-gray-200">
