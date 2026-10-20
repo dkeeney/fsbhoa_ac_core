@@ -94,7 +94,10 @@ function fsbhoa_render_live_monitor_view() {
                 <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
                 <!-- Vehicle Activity (ac_vehicle_log; filled by fsbhoa-vehicle-monitor.js) -->
                 <div id="vehicle-log-column">
-                    <h2 class="text-xl font-semibold mb-4">Vehicle Gate Traffic</h2>
+                    <h2 class="text-xl font-semibold mb-4" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Vehicle Gate Traffic</span>
+                        <button type="button" id="vehicle-alert-test-sound" title="Play the alert sound, to check the speakers (this also turns the sound on for this page)" style="font-size: 13px; font-weight: normal; padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer;">&#128276; Test sound</button>
+                    </h2>
                     <div class="bg-white rounded-xl shadow-md overflow-hidden">
                         <div id="vehicle-log-container" style="height: 36rem; overflow-y: auto;">
                             <ul id="vehicle-event-list" class="divide-y divide-gray-200">

@@ -226,9 +226,15 @@
            }
            return audioCtx;
         }
+        // A click that turns the sound on plays it at once if an alert is showing
         function unlockAudio() {
            const ctx = audio();
-           if (ctx && ctx.state === 'suspended') ctx.resume().then(renderBanner, function() {});
+           if (ctx && ctx.state === 'suspended') {
+              ctx.resume().then(function() {
+                 renderBanner();
+                 if (activeAlerts.length > 0) playAlarm();
+              }, function() {});
+           }
         }
         document.addEventListener('click', unlockAudio);
         document.addEventListener('keydown', unlockAudio);
@@ -282,6 +288,17 @@
               ? '<div style="background: #7f1d1d; color: #fff; padding: 4px 20px; font-size: 14px;">Click anywhere on this page to turn on the alert sound.</div>'
               : '');
            banner.style.display = 'block';
+        }
+
+        // "Test sound" next to the column's heading: staff check their speakers, and the click
+        // turns the sound on for this page
+        const testSound = document.getElementById('vehicle-alert-test-sound');
+        if (testSound) {
+           testSound.addEventListener('click', function() {
+              const ctx = audio();
+              if (!ctx) return;
+              ctx.resume().then(function() { renderBanner(); playAlarm(); }, function() {});
+           });
         }
 
         if (banner) {
