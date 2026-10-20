@@ -80,13 +80,17 @@ CREATE TABLE IF NOT EXISTS `ac_vehicle_log` (
   `raw_details` json DEFAULT NULL COMMENT 'Hardware inputs and timings, as sent by the vehicle service',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice',
+  `alert_key` varchar(32) DEFAULT NULL COMMENT 'A lane alert''s kind (such as arm_broken); NULL for a vehicle',
+  `alert_text` varchar(100) DEFAULT NULL COMMENT 'What the monitor shows for the alert',
+  `alert_active` tinyint(1) DEFAULT NULL COMMENT '1 when the alert starts, 0 when it ends',
   PRIMARY KEY (`vehicle_log_id`),
   UNIQUE KEY `uniq_event_uid` (`event_uid`),
   KEY `idx_timestamp_gate` (`event_timestamp`, `gate_identifier`),
   KEY `idx_lpr_plate` (`lpr_plate_string`),
   KEY `idx_auth_id` (`auth_id`),
   KEY `idx_circumvention` (`is_circumvention`, `event_timestamp`),
-  KEY `idx_auth_lookup` (`auth_type`, `auth_id`)
+  KEY `idx_auth_lookup` (`auth_type`, `auth_id`),
+  KEY `idx_alert` (`alert_key`, `gate_identifier`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT INTO `ac_credential_types` (`type_code`, `description`) VALUES

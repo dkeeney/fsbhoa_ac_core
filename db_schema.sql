@@ -361,7 +361,10 @@ CREATE TABLE `ac_vehicle_log` (
   `overview_image_data` mediumblob DEFAULT NULL COMMENT 'Photo of the vehicle from the lane overview camera',
   `raw_details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'Hardware inputs and timings, as sent by the vehicle service' CHECK (json_valid(`raw_details`)),
   `created_at` datetime DEFAULT current_timestamp(),
-  `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice'
+  `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice',
+  `alert_key` varchar(32) DEFAULT NULL COMMENT 'A lane alert''s kind (such as arm_broken); NULL for a vehicle',
+  `alert_text` varchar(100) DEFAULT NULL COMMENT 'What the monitor shows for the alert',
+  `alert_active` tinyint(1) DEFAULT NULL COMMENT '1 when the alert starts, 0 when it ends'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -526,7 +529,8 @@ ALTER TABLE `ac_vehicle_log`
   ADD KEY `idx_lpr_plate` (`lpr_plate_string`),
   ADD KEY `idx_auth_id` (`auth_id`),
   ADD KEY `idx_circumvention` (`is_circumvention`,`event_timestamp`),
-  ADD KEY `idx_auth_lookup` (`auth_type`,`auth_id`);
+  ADD KEY `idx_auth_lookup` (`auth_type`,`auth_id`),
+  ADD KEY `idx_alert` (`alert_key`,`gate_identifier`);
 
 --
 -- AUTO_INCREMENT for dumped tables

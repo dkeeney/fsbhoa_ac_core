@@ -23,11 +23,17 @@
  *   context_image_b64  scene photo, base64 JPEG
  *   overview_image_b64 the lane overview camera's photo of the vehicle, base64 JPEG
  *   raw_details        any JSON object: the sender's inputs and timings
+ *   alert_key          a lane alert instead of a vehicle: its kind (letters, digits, _ and -,
+ *                      up to 32), such as arm_broken. One kind per lane is either on or off.
+ *   alert_text         what the monitor shows for it ("Arm broken"), up to 100 characters
+ *   alert_active       true when the alert starts, false when it ends
  * Replies { success, vehicle_log_id[, duplicate] }. 409 for the other environment's event,
  * 503 when this server's environment isn't set.
  *
- * GET /vehicle-recent[?since=<vehicle_log_id>] and GET /vehicle-image/<id>?type=lpr|context|overview
- * are for the monitor page (logged-in admin, X-WP-Nonce or _wpnonce).
+ * GET /vehicle-recent[?since=<vehicle_log_id>], GET /vehicle-image/<id>?type=lpr|context|overview
+ * and GET /vehicle-alerts (the lane alerts now on: each lane and kind whose latest row has
+ * alert_active 1) are for the monitor page (logged-in admin, X-WP-Nonce or _wpnonce). The
+ * monitor shows an alert that is on as a red banner, with a sound, until its end arrives.
  *
  * @package Fsbhoa_Ac
  */
@@ -69,6 +75,13 @@ class Fsbhoa_Vehicle_Log_REST_API {
         register_rest_route( $this->namespace, '/vehicle-recent', array(
             'methods'             => 'GET',
             'callback'            => array( $this, 'get_recent' ),
+            'permission_callback' => array( $this, 'monitor_user_permission_check' ),
+        ) );
+
+        // Lane alerts that are on, for the monitor's banner
+        register_rest_route( $this->namespace, '/vehicle-alerts', array(
+            'methods'             => 'GET',
+            'callback'            => array( $this, 'get_active_alerts' ),
             'permission_callback' => array( $this, 'monitor_user_permission_check' ),
         ) );
     }
@@ -137,6 +150,19 @@ class Fsbhoa_Vehicle_Log_REST_API {
         $confidence  = isset( $params['lpr_confidence'] ) ? absint( $params['lpr_confidence'] ) : null;
         $raw_details = ! empty( $params['raw_details'] ) ? wp_json_encode( $params['raw_details'] ) : null;
 
+        // A lane alert (such as a broken arm) rather than a vehicle
+        $alert_key    = null;
+        $alert_text   = null;
+        $alert_active = null;
+        if ( ! empty( $params['alert_key'] ) ) {
+            $alert_key = (string) $params['alert_key'];
+            if ( ! preg_match( '/^[A-Za-z0-9_-]{1,32}$/', $alert_key ) ) {
+                return new WP_Error( 'invalid_alert', 'alert_key may have only letters, digits, _ and -, up to 32', array( 'status' => 400 ) );
+            }
+            $alert_text   = mb_substr( sanitize_text_field( $params['alert_text'] ?? '' ), 0, 100 );
+            $alert_active = ! empty( $params['alert_active'] ) ? 1 : 0;
+        }
+
         $data = array(
             'event_timestamp'    => $timestamp,
             'gate_identifier'    => sanitize_text_field( $params['gate_identifier'] ?? '' ),
@@ -151,9 +177,12 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'overview_image_data' => $overview_blob,
             'raw_details'        => $raw_details,
             'event_uid'          => '' !== $event_uid ? $event_uid : null,
+            'alert_key'          => $alert_key,
+            'alert_text'         => $alert_text,
+            'alert_active'       => $alert_active,
         );
 
-        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s' );
+        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d' );
         $inserted = $wpdb->insert( $table, $data, $formats );
 
         if ( false === $inserted ) {
@@ -220,6 +249,9 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 vl.lpr_plate_string,
                 vl.lpr_confidence,
                 vl.is_circumvention,
+                vl.alert_key,
+                vl.alert_text,
+                vl.alert_active,
                 (vl.context_image_data IS NOT NULL) AS has_context_img,
                 (vl.lpr_image_data IS NOT NULL) AS has_lpr_img,
                 (vl.overview_image_data IS NOT NULL) AS has_overview_img,
@@ -291,6 +323,35 @@ class Fsbhoa_Vehicle_Log_REST_API {
         if ( ! empty( $wpdb->last_error ) ) {
             error_log( 'FSBHOA Vehicle Log: vehicle-recent query failed: ' . $wpdb->last_error . ' -- ' . $wpdb->last_query );
             return new WP_Error( 'db_error', 'Could not load vehicle events', array( 'status' => 500 ) );
+        }
+
+        return rest_ensure_response( ! empty( $results ) ? $results : array() );
+    }
+
+    /**
+     * The lane alerts that are on: for each lane and alert kind, its latest row, when that
+     * row started the alert. Oldest first.
+     */
+    public function get_active_alerts( WP_REST_Request $request ) {
+        global $wpdb;
+        $table = self::TABLE;
+
+        $results = $wpdb->get_results(
+            "SELECT vl.vehicle_log_id, vl.event_timestamp, vl.gate_identifier, vl.alert_key, vl.alert_text,
+                    (vl.overview_image_data IS NOT NULL) AS has_overview_img
+               FROM {$table} vl
+               JOIN ( SELECT MAX(vehicle_log_id) AS id
+                        FROM {$table}
+                       WHERE alert_key IS NOT NULL
+                       GROUP BY gate_identifier, alert_key ) latest ON latest.id = vl.vehicle_log_id
+              WHERE vl.alert_active = 1
+              ORDER BY vl.vehicle_log_id ASC",
+            ARRAY_A
+        );
+
+        if ( ! empty( $wpdb->last_error ) ) {
+            error_log( 'FSBHOA Vehicle Log: vehicle-alerts query failed: ' . $wpdb->last_error );
+            return new WP_Error( 'db_error', 'Could not load vehicle alerts', array( 'status' => 500 ) );
         }
 
         return rest_ensure_response( ! empty( $results ) ? $results : array() );

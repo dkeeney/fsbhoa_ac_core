@@ -83,6 +83,11 @@ function fsbhoa_render_live_monitor_view() {
             </div>
        </div>
 
+       <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
+       <!-- Lane alerts that are on, such as a broken arm (/vehicle-alerts; filled by fsbhoa-vehicle-monitor.js) -->
+       <div id="vehicle-alert-banner" role="alert" style="display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;"></div>
+       <?php endif; ?>
+
        <div id="activity-log-section">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; max-width: 1400px; margin: 0 auto;">
 
