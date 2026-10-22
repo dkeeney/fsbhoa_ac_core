@@ -189,7 +189,9 @@ class Fsbhoa_Shortcodes {
             wp_enqueue_style('fsbhoa-live-monitor-styles', FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-monitor.css', array(), FSBHOA_AC_PLUGIN_VERSION);
 
             $script_handle = 'fsbhoa-live-monitor-script';
-            wp_enqueue_script($script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-live-monitor.js', [], FSBHOA_AC_PLUGIN_VERSION, true);
+            // Versioned by the file's time, so browsers fetch it again whenever it changes
+            $monitor_js = 'assets/js/fsbhoa-live-monitor.js';
+            wp_enqueue_script($script_handle, FSBHOA_AC_PLUGIN_URL . $monitor_js, [], (string) filemtime(FSBHOA_AC_PLUGIN_DIR . $monitor_js), true);
 
             $ws_port = get_option('fsbhoa_ac_monitor_port', 8082);
             // Fail closed: with no host set, connect nowhere (the page shows "Configuration Error")
@@ -202,7 +204,7 @@ class Fsbhoa_Shortcodes {
                 $ws_url = sprintf('wss://%s:%d/ws', $ws_host, $ws_port);
             }
 
-            wp_localize_script($script_handle, 'fsbhoa_monitor_vars', [ 'ws_url' => $ws_url, 'nonce' => wp_create_nonce('wp_rest') ]);
+            wp_localize_script($script_handle, 'fsbhoa_monitor_vars', [ 'ws_url' => $ws_url, 'nonce' => wp_create_nonce('wp_rest'), 'history_hours' => Fsbhoa_Monitor_REST_API::history_hours() ]);
 
             // Vehicle column: polls /vehicle-recent; only when a vehicle hardware plugin turns it on
             if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) {
@@ -210,7 +212,7 @@ class Fsbhoa_Shortcodes {
                 $vehicle_js = 'assets/js/fsbhoa-vehicle-monitor.js';
                 wp_enqueue_script('fsbhoa-vehicle-monitor-js', FSBHOA_AC_PLUGIN_URL . $vehicle_js, [], (string) filemtime(FSBHOA_AC_PLUGIN_DIR . $vehicle_js), true);
                 // The vehicle routes require a logged-in admin; WordPress needs the nonce to recognize the user.
-                wp_localize_script('fsbhoa-vehicle-monitor-js', 'fsbhoa_vehicle_vars', [ 'nonce' => wp_create_nonce('wp_rest') ]);
+                wp_localize_script('fsbhoa-vehicle-monitor-js', 'fsbhoa_vehicle_vars', [ 'nonce' => wp_create_nonce('wp_rest'), 'history_hours' => Fsbhoa_Monitor_REST_API::history_hours() ]);
             }
         }
 

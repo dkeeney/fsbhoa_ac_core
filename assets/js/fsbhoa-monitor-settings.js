@@ -130,6 +130,7 @@ jQuery(document).ready(function($) {
             port: $('#fsbhoa_ac_monitor_port').val(),
             status_group_id: $('#fsbhoa_monitor_status_group_id').val(),
             photo_limit: $('#fsbhoa_ac_monitor_photo_limit').val(),
+            history_hours: $('#fsbhoa_ac_monitor_history_hours').val(),
             status_group_id: $('#fsbhoa_monitor_status_group_id').val(),
             gates: Object.keys(gatePositions).map(id => ({
                 id: id,

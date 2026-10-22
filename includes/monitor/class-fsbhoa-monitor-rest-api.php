@@ -13,6 +13,29 @@ class Fsbhoa_Monitor_REST_API {
 
     private $namespace = 'fsbhoa/v1';
 
+    // How far back the live monitor's columns go (pedestrian and vehicle), from the monitor settings
+    const HISTORY_OPTION        = 'fsbhoa_ac_monitor_history_hours';
+    const HISTORY_DEFAULT_HOURS = 24;
+    const HISTORY_MIN_HOURS     = 1;
+    const HISTORY_MAX_HOURS     = 168;
+    // A cap on the rows sent on the first load, whatever the hours
+    const HISTORY_MAX_ROWS      = 5000;
+
+    /**
+     * Hours of activity the live monitor's columns show, from the monitor settings.
+     */
+    public static function history_hours() {
+        return self::sanitize_history_hours( get_option( self::HISTORY_OPTION, self::HISTORY_DEFAULT_HOURS ) );
+    }
+
+    /**
+     * Clamp a submitted value to HISTORY_MIN_HOURS..HISTORY_MAX_HOURS; anything else becomes the default.
+     */
+    public static function sanitize_history_hours( $value ) {
+        $hours = absint( $value );
+        return ( $hours >= self::HISTORY_MIN_HOURS && $hours <= self::HISTORY_MAX_HOURS ) ? $hours : self::HISTORY_DEFAULT_HOURS;
+    }
+
     /**
      * Whether the live monitor shows the pedestrian column (ac_access_log). Off unless a
      * hardware plugin that posts to /monitor/log-event turns it on through the
@@ -292,8 +315,16 @@ class Fsbhoa_Monitor_REST_API {
             return new WP_Error('db_error', 'Database error fetching recent activity.', ['status' => 500, 'db_error' => $wpdb->last_error]);
         }
 
+        // Only the newest few cards are shown expanded, with the cardholder's photo (Photo
+        // Event Limit); the rest of the history goes without, so it stays small.
+        $photo_limit = (int) get_option('fsbhoa_ac_monitor_photo_limit', 3);
+
         $formatted_events = [];
-        foreach ($results as $event) {
+        foreach ($results as $i => $event) {
+            $event['photo'] = null;
+            if ($i < $photo_limit && !empty($event['cardholder_id'])) {
+                $event['photo'] = $wpdb->get_var($wpdb->prepare("SELECT photo FROM ac_cardholders WHERE id = %d", $event['cardholder_id']));
+            }
             $cardholder_name = trim($event['first_name'] . ' ' . $event['last_name']);
             if (empty($cardholder_name) && !empty($event['rfid_id']) && $event['rfid_id'] != 0) {
                 $cardholder_name = 'Unknown Card (' . $event['rfid_id'] . ')';
@@ -309,6 +340,7 @@ class Fsbhoa_Monitor_REST_API {
                 'photoURL'       => !empty($event['photo']) ? 'data:image/jpeg;base64,' . base64_encode($event['photo']) : '',
                 'gateName'       => $event['gate_name'] ?: ($event['controller_name'] ?: 'Unknown Gate'),
                 'timestamp'      => date('g:i:s A', strtotime($event['event_timestamp'])),
+                'eventTime'      => $event['event_timestamp'], // local, for dropping cards older than the history
                 'eventMessage'   => $event['event_description'],
                 'cardNumber'     => (int)ltrim((string)$event['rfid_id'], '0'),
                 'controller_identifier' => $event['controller_identifier'],
@@ -329,19 +361,19 @@ class Fsbhoa_Monitor_REST_API {
         $controllers_table = 'ac_controllers';
         $property_table = 'ac_property';
 
-        // It uses the database's internal clock, to get records in the last 24 hrs.
+        // It uses the database's internal clock, to get the records of the monitor's history (24 hours by default).
         $query = "SELECT l.log_id, l.event_timestamp, l.access_granted, 
             l.event_description, l.rfid_id, 
             l.controller_identifier, ch.id AS cardholder_id, ch.first_name, ch.last_name, 
-            ch.photo, d.friendly_name AS gate_name, c.friendly_name AS controller_name, d.door_record_id, p.street_address
+            d.friendly_name AS gate_name, c.friendly_name AS controller_name, d.door_record_id, p.street_address
             FROM {$log_table} AS l
             LEFT JOIN {$cardholders_table} AS ch ON l.cardholder_id = ch.id
             LEFT JOIN {$controllers_table} AS c ON l.controller_identifier = c.uhppoted_device_id
             LEFT JOIN {$doors_table} AS d ON c.controller_record_id = d.controller_record_id AND l.door_number = d.door_number_on_controller
             LEFT JOIN {$property_table} AS p ON ch.property_id = p.property_id
-            WHERE l.event_timestamp >= NOW() - INTERVAL 24 HOUR
+            WHERE l.event_timestamp >= NOW() - INTERVAL " . self::history_hours() . " HOUR
             ORDER BY l.event_timestamp DESC
-            LIMIT 50";
+            LIMIT " . self::HISTORY_MAX_ROWS;
 
         return $query;
     }

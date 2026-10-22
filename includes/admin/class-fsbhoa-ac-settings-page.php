@@ -260,6 +260,7 @@ class Fsbhoa_Ac_Settings_Page {
         register_setting($this->monitor_settings_option_group, 'fsbhoa_monitor_map_url', 'esc_url_raw');
         register_setting($this->monitor_settings_option_group, 'fsbhoa_ac_monitor_port', 'absint');
         register_setting($this->monitor_settings_option_group, 'fsbhoa_ac_monitor_photo_limit', 'absint');
+        register_setting($this->monitor_settings_option_group, Fsbhoa_Monitor_REST_API::HISTORY_OPTION, array('Fsbhoa_Monitor_REST_API', 'sanitize_history_hours'));
         register_setting($this->monitor_settings_option_group, Fsbhoa_Vehicle_Log_Retention::OPTION_NAME, array('Fsbhoa_Vehicle_Log_Retention', 'sanitize_days'));
     }
 
@@ -425,6 +426,15 @@ class Fsbhoa_Ac_Settings_Page {
                             <p class="description">The number of recent events to display with a photo in the activity log.</p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="fsbhoa_ac_monitor_history_hours">Monitor History (hours)</label>
+                        </th>
+                        <td>
+                            <input name="<?php echo esc_attr(Fsbhoa_Monitor_REST_API::HISTORY_OPTION); ?>" type="number" id="fsbhoa_ac_monitor_history_hours" value="<?php echo esc_attr(Fsbhoa_Monitor_REST_API::history_hours()); ?>" min="<?php echo esc_attr(Fsbhoa_Monitor_REST_API::HISTORY_MIN_HOURS); ?>" max="<?php echo esc_attr(Fsbhoa_Monitor_REST_API::HISTORY_MAX_HOURS); ?>" class="small-text" />
+                            <p class="description">How far back the live monitor's activity columns go, pedestrian and vehicle (default 24). Older entries drop off the bottom. A weekday at the vehicle gates is about 1,400 entries.</p>
+                        </td>
+                    </tr>
                     <?php if ( Fsbhoa_Vehicle_Log_REST_API::show_monitor_column() ) : ?>
                     <tr>
                         <th scope="row">
@@ -544,6 +554,9 @@ class Fsbhoa_Ac_Settings_Page {
         update_option('fsbhoa_ac_monitor_port', $port);
         update_option('fsbhoa_monitor_status_group_id', $status_group);
         update_option('fsbhoa_ac_monitor_photo_limit', $photo_limit);
+        if (isset($_POST['history_hours'])) {
+            update_option(Fsbhoa_Monitor_REST_API::HISTORY_OPTION, Fsbhoa_Monitor_REST_API::sanitize_history_hours($_POST['history_hours']));
+        }
         // Shown only when the vehicle column is on, so save it only when it was sent
         if (isset($_POST['vehicle_photo_days'])) {
             update_option(Fsbhoa_Vehicle_Log_Retention::OPTION_NAME, Fsbhoa_Vehicle_Log_Retention::sanitize_days($_POST['vehicle_photo_days']));

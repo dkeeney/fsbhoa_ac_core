@@ -10,6 +10,8 @@
         const nonce = (window.fsbhoa_vehicle_vars && window.fsbhoa_vehicle_vars.nonce) || '';
         const nonceParam = '&_wpnonce=' + encodeURIComponent(nonce);
         let lastKnownId = 0;
+        // How far back the column goes (the Monitor History setting)
+        const historyHours = parseInt(window.fsbhoa_vehicle_vars && window.fsbhoa_vehicle_vars.history_hours, 10) || 24;
 
         // Escape text from the server before it goes into innerHTML.
         function esc(value) {
@@ -203,11 +205,11 @@
            vehicleEventList.prepend(card);
         }
 
-        // The column holds the last 24 hours, as /vehicle-recent sends them on the first load
-        // (about 1,400 cards on a weekday; thumbnails load as they scroll into view). Older
-        // cards drop off the bottom.
+        // The column holds the monitor's history (24 hours by default), as /vehicle-recent sends
+        // it on the first load (about 1,400 cards on a weekday; thumbnails load as they scroll
+        // into view). Older cards drop off the bottom.
         function dropOldCards() {
-           const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+           const cutoff = Date.now() - historyHours * 60 * 60 * 1000;
            let last = vehicleEventList.lastElementChild;
            while (last && last.dataset.at) {
                const at = new Date(last.dataset.at.replace(' ', 'T')).getTime();

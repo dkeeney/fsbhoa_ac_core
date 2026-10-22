@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const statusText = connectionStatus ? connectionStatus.querySelector('span') : null;
     let lastEventTimestamp = '';
     let maxExpandedEvents = 3;
+    // How far back the column goes (the Monitor History setting); older cards drop off the bottom
+    const historyHours = parseInt(window.fsbhoa_monitor_vars && window.fsbhoa_monitor_vars.history_hours, 10) || 24;
     
     // eventList is missing when no hardware plugin turns on the pedestrian column
     // (fsbhoa_monitor_show_pedestrian_column); the map and gate lights still run.
@@ -204,6 +206,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function createEventCard(eventData, isExpanded) {
         const li = document.createElement('li');
         li.dataset.eventData = JSON.stringify(eventData);
+        li.dataset.at = eventData.atMs;
 
         if (eventData.logId) {
             li.dataset.logId = eventData.logId;
@@ -305,6 +308,11 @@ document.addEventListener('DOMContentLoaded', function () {
             logPlaceholder = null;
         }
 
+        // When it happened, for dropping it once it's older than the history: the server's
+        // time for loaded events, the arrival time for live ones
+        eventData.atMs = eventData.eventTime
+            ? new Date(eventData.eventTime.replace(' ', 'T')).getTime()
+            : Date.now();
         const newEventCard = createEventCard(eventData, true);
         eventList.prepend(newEventCard);
 
@@ -321,9 +329,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        while (eventList.children.length > 50) {
-            eventList.removeChild(eventList.lastChild);
-        }
+        dropOldEvents();
 
         // 2. Update the 'lastEventTimestamp' with the new timestamp.
         lastEventTimestamp = eventData.timestamp;
@@ -377,6 +383,19 @@ document.addEventListener('DOMContentLoaded', function () {
             mapContainer.appendChild(light);
         });
     }
+
+    function dropOldEvents() {
+        if (!eventList) {
+            return;
+        }
+        const cutoff = Date.now() - historyHours * 60 * 60 * 1000;
+        let last = eventList.lastElementChild;
+        while (last && last.dataset.at && Number(last.dataset.at) < cutoff) {
+            last.remove();
+            last = eventList.lastElementChild;
+        }
+    }
+    setInterval(dropOldEvents, 60 * 1000);
 
     async function loadRecentActivity() {
         if (!eventList) {

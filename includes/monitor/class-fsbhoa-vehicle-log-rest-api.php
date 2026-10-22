@@ -260,8 +260,8 @@ class Fsbhoa_Vehicle_Log_REST_API {
     }
 
     /**
-     * Recent events with the cardholder each credential belongs to: the last 24 hours on the
-     * first load, then only rows after ?since=<vehicle_log_id>.
+     * Recent events with the cardholder each credential belongs to: the monitor's history (the
+     * Monitor History setting, 24 hours by default) on the first load, then only rows after ?since=<vehicle_log_id>.
      */
     public function get_recent( WP_REST_Request $request ) {
         global $wpdb;
@@ -347,9 +347,9 @@ class Fsbhoa_Vehicle_Log_REST_API {
             $query = "SELECT " . $select_fields . "
                       FROM " . $table . " vl
                       " . $joins . "
-                      WHERE vl.event_timestamp >= (NOW() - INTERVAL 24 HOUR)
+                      WHERE vl.event_timestamp >= (NOW() - INTERVAL " . Fsbhoa_Monitor_REST_API::history_hours() . " HOUR)
                       ORDER BY vl.event_timestamp DESC
-                      LIMIT 5000";
+                      LIMIT " . Fsbhoa_Monitor_REST_API::HISTORY_MAX_ROWS;
         }
 
         $results = $wpdb->get_results( $query, ARRAY_A );
