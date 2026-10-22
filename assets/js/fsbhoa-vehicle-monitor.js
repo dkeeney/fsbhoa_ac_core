@@ -52,7 +52,7 @@
            const overviewUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=overview' + nonceParam;
            const photo = isTrue(event.has_overview_img)
                ? '<div style="flex-shrink: 0; cursor: pointer;" onclick="openVehicleScene(\'' + overviewUrl + '\')" title="Click to view the overview camera\'s photo">' +
-                    '<img src="' + overviewUrl + '" alt="' + esc(gate) + '" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1;" onerror="this.style.display=\'none\';">' +
+                    '<img loading="lazy" src="' + overviewUrl + '" alt="' + esc(gate) + '" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1;" onerror="this.style.display=\'none\';">' +
                  '</div>'
                : '';
            li.setAttribute('style', 'padding: 16px; display: flex; gap: 16px; align-items: flex-start; ' +
@@ -129,7 +129,7 @@
            // One thumbnail that opens its full photo in the lightbox.
            function thumb(thumbUrl, fullUrl, alt, title, caption) {
                return '<div style="cursor: pointer; text-align: center;" onclick="openVehicleScene(\'' + fullUrl + '\')" title="' + title + '">' +
-                  '<img src="' + thumbUrl + '" alt="' + esc(alt) + '" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; background: #e2e8f0;" onerror="this.style.display=\'none\';">' +
+                  '<img loading="lazy" src="' + thumbUrl + '" alt="' + esc(alt) + '" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; background: #e2e8f0;" onerror="this.style.display=\'none\';">' +
                  '<div style="font-size: 9px; color: #64748b; margin-top: 2px;">' + caption + '</div>' +
                '</div>';
            }
@@ -199,10 +199,21 @@
            if (id > lastKnownId) lastKnownId = id;
 
            const card = createCard(event);
+           card.dataset.at = event.event_timestamp || '';
            vehicleEventList.prepend(card);
+        }
 
-           while (vehicleEventList.children.length > 50) {
-               vehicleEventList.removeChild(vehicleEventList.lastChild);
+        // The column holds the last 24 hours, as /vehicle-recent sends them on the first load
+        // (about 1,400 cards on a weekday; thumbnails load as they scroll into view). Older
+        // cards drop off the bottom.
+        function dropOldCards() {
+           const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+           let last = vehicleEventList.lastElementChild;
+           while (last && last.dataset.at) {
+               const at = new Date(last.dataset.at.replace(' ', 'T')).getTime();
+               if (!(at < cutoff)) break;
+               last.remove();
+               last = vehicleEventList.lastElementChild;
            }
         }
 
@@ -223,6 +234,7 @@
                      events.forEach(addEvent);
                   }
                }
+               dropOldCards();
            } catch (err) {
                console.warn('Vehicle monitor fetch error:', err);
            }

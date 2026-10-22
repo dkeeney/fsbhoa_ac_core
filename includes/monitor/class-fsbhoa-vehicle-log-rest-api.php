@@ -202,9 +202,15 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'alert_text'         => $alert_text,
             'alert_active'       => $alert_active,
             'alert_notice'       => $alert_notice,
+            // Whether each photo is there, so lists don't read the photos (MariaDB reads a
+            // whole blob even for IS NOT NULL: 5 s for a day's rows)
+            'has_context_img'    => ! empty( $context_blob ) ? 1 : 0,
+            'has_lpr_img'        => ! empty( $lpr_blob ) ? 1 : 0,
+            'has_overview_img'   => ! empty( $overview_blob ) ? 1 : 0,
+            'has_note_img'       => ! empty( $note_blob ) ? 1 : 0,
         );
 
-        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d' );
+        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%d' );
         $inserted = $wpdb->insert( $table, $data, $formats );
 
         if ( false === $inserted ) {
@@ -278,11 +284,11 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 vl.alert_notice,
                 vl.alert_ack_at,
                 vl.alert_ack_by,
-                (vl.context_image_data IS NOT NULL) AS has_context_img,
-                (vl.lpr_image_data IS NOT NULL) AS has_lpr_img,
-                (vl.overview_image_data IS NOT NULL) AS has_overview_img,
+                vl.has_context_img,
+                vl.has_lpr_img,
+                vl.has_overview_img,
                 vl.event_note,
-                (vl.note_image_data IS NOT NULL) AS has_note_img,
+                vl.has_note_img,
                 COALESCE(
                     CASE WHEN vl.auth_type = 'DK_WINDSHIELD' THEN NULLIF(h.primary_cardholder_id, 0) END,
                     NULLIF(cred.cardholder_id, 0),
@@ -343,7 +349,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
                       " . $joins . "
                       WHERE vl.event_timestamp >= (NOW() - INTERVAL 24 HOUR)
                       ORDER BY vl.event_timestamp DESC
-                      LIMIT 200";
+                      LIMIT 5000";
         }
 
         $results = $wpdb->get_results( $query, ARRAY_A );
@@ -366,7 +372,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
 
         $results = $wpdb->get_results(
             "SELECT vl.vehicle_log_id, vl.event_timestamp, vl.gate_identifier, vl.alert_key, vl.alert_text,
-                    (vl.overview_image_data IS NOT NULL) AS has_overview_img
+                    vl.has_overview_img
                FROM {$table} vl
                JOIN ( SELECT MAX(vehicle_log_id) AS id
                         FROM {$table}
