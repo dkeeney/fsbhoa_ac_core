@@ -204,6 +204,12 @@
            return !currentLane || card.dataset.gate === currentLane;
         }
 
+        // Hide or show a card, putting back its own display (the cards are laid out as flex)
+        function showCard(card, show) {
+           if (card.dataset.display === undefined) card.dataset.display = card.style.display;
+           card.style.display = show ? card.dataset.display : 'none';
+        }
+
         function applyLaneFilter() {
            laneButtons.forEach(b => {
               const on = b.dataset.lane === currentLane;
@@ -212,7 +218,7 @@
                  (on ? '#1d4ed8; background: #1d4ed8; color: #fff; font-weight: 600;' : '#cbd5e1; background: #fff; color: #1f2937;');
            });
            Array.from(vehicleEventList.children).forEach(card => {
-              if (card.dataset.gate !== undefined) card.style.display = showsLane(card) ? '' : 'none';
+              if (card.dataset.gate !== undefined) showCard(card, showsLane(card));
            });
         }
 
@@ -235,7 +241,7 @@
            const card = createCard(event);
            card.dataset.at = event.event_timestamp || '';
            card.dataset.gate = event.gate_identifier || '';
-           if (!showsLane(card)) card.style.display = 'none';
+           if (!showsLane(card)) showCard(card, false);
            vehicleEventList.prepend(card);
         }
 
