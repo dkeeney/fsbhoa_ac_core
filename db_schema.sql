@@ -366,7 +366,8 @@ CREATE TABLE `ac_vehicle_log` (
   `alert_text` varchar(100) DEFAULT NULL COMMENT 'What the monitor shows for the alert',
   `alert_active` tinyint(1) DEFAULT NULL COMMENT '1 when the alert starts, 0 when it ends',
   `alert_ack_at` datetime DEFAULT NULL COMMENT 'When staff acknowledged the alert',
-  `alert_ack_by` varchar(60) DEFAULT NULL COMMENT 'Who acknowledged it'
+  `alert_ack_by` varchar(60) DEFAULT NULL COMMENT 'Who acknowledged it',
+  `alert_notice` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 for a notice: shown, without the alarm or acknowledgment'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --

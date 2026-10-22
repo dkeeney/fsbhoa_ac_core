@@ -35,12 +35,19 @@
         }
 
         // A lane alert's row (such as a broken arm): red when it starts, green when it ends,
-        // with the overview camera's photo of the lane.
+        // with the overview camera's photo of the lane. A notice (such as the arm held up) is
+        // amber when it starts and grey when it ends, and has no alarm.
         function createAlertCard(event) {
            const li = document.createElement('li');
            const logId = parseInt(event.vehicle_log_id, 10);
            li.dataset.logId = logId;
            const active = isTrue(event.alert_active);
+           const notice = isTrue(event.alert_notice);
+           const look = notice
+               ? (active ? { border: '#d97706', bg: '#fffbeb', text: '#92400e', icon: '&#9432; ' }
+                         : { border: '#94a3b8', bg: '#f8fafc', text: '#334155', icon: '&#10003; ' })
+               : (active ? { border: '#dc2626', bg: '#fee2e2', text: '#991b1b', icon: '&#9888; ' }
+                         : { border: '#16a34a', bg: '#f0fdf4', text: '#166534', icon: '&#10003; ' });
            const gate = event.gate_identifier || 'Vehicle Gate';
            const overviewUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=overview' + nonceParam;
            const photo = isTrue(event.has_overview_img)
@@ -48,14 +55,13 @@
                     '<img src="' + overviewUrl + '" alt="' + esc(gate) + '" style="width: 80px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1;" onerror="this.style.display=\'none\';">' +
                  '</div>'
                : '';
-           li.setAttribute('style', 'padding: 16px; display: flex; gap: 16px; align-items: flex-start; ' + (active
-               ? 'border-left: 6px solid #dc2626; background: #fee2e2;'
-               : 'border-left: 6px solid #16a34a; background: #f0fdf4;'));
+           li.setAttribute('style', 'padding: 16px; display: flex; gap: 16px; align-items: flex-start; ' +
+               'border-left: 6px solid ' + look.border + '; background: ' + look.bg + ';');
            li.innerHTML = photo +
                '<div style="flex: 1; min-width: 0;">' +
                   '<div style="display: flex; justify-content: space-between; align-items: baseline;">' +
-                    '<span style="font-size: 16px; font-weight: bold; color: ' + (active ? '#991b1b' : '#166534') + ';">' +
-                       (active ? '&#9888; ' : '&#10003; ') + esc(event.alert_text || event.alert_key) + '</span>' +
+                    '<span style="font-size: 16px; font-weight: bold; color: ' + look.text + ';">' +
+                       look.icon + esc(event.alert_text || event.alert_key) + '</span>' +
                     '<time style="font-size: 12px; color: #64748b; font-family: monospace;">' + esc(formatTime(event.event_timestamp)) + '</time>' +
                   '</div>' +
                   '<div style="font-size: 13px; color: #334155; margin-top: 4px; font-weight: 500;">' + esc(gate) + '</div>' +

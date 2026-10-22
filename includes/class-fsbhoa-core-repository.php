@@ -378,6 +378,7 @@ class Fsbhoa_Core_Repository {
             `alert_active` tinyint(1) DEFAULT NULL COMMENT '1 when the alert starts, 0 when it ends',
             `alert_ack_at` datetime DEFAULT NULL COMMENT 'When staff acknowledged the alert',
             `alert_ack_by` varchar(60) DEFAULT NULL COMMENT 'Who acknowledged it',
+            `alert_notice` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1 for a notice: shown, without the alarm or acknowledgment',
             PRIMARY KEY (`vehicle_log_id`),
             UNIQUE KEY `uniq_event_uid` (`event_uid`),
             KEY `idx_timestamp_gate` (`event_timestamp`, `gate_identifier`),

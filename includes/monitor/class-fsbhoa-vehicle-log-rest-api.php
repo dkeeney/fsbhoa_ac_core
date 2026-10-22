@@ -27,12 +27,14 @@
  *                      up to 32), such as arm_broken. One kind per lane is either on or off.
  *   alert_text         what the monitor shows for it ("Arm broken"), up to 100 characters
  *   alert_active       true when the alert starts, false when it ends
+ *   alert_notice       true for a notice (such as the arm held up): shown in the list
+ *                      when it starts and ends, without the alarm or acknowledgment
  * Replies { success, vehicle_log_id[, duplicate] }. 409 for the other environment's event,
  * 503 when this server's environment isn't set.
  *
  * GET /vehicle-recent[?since=<vehicle_log_id>], GET /vehicle-image/<id>?type=lpr|context|overview,
  * GET /vehicle-alerts (the lane alerts now on that nobody has acknowledged: each lane and kind
- * whose latest row has alert_active 1 and no alert_ack_at) and POST /vehicle-alerts/<id>/ack
+ * whose latest row has alert_active 1, alert_notice 0 and no alert_ack_at) and POST /vehicle-alerts/<id>/ack
  * (staff saw it: records who and when) are for the monitor page (logged-in admin, X-WP-Nonce
  * or _wpnonce). The monitor shows each alert from /vehicle-alerts as a pulsing red card at
  * the top of the vehicle column, with an alarm sound, a desktop notification and a flashing
@@ -164,6 +166,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
         $alert_key    = null;
         $alert_text   = null;
         $alert_active = null;
+        $alert_notice = 0;
         if ( ! empty( $params['alert_key'] ) ) {
             $alert_key = (string) $params['alert_key'];
             if ( ! preg_match( '/^[A-Za-z0-9_-]{1,32}$/', $alert_key ) ) {
@@ -171,6 +174,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
             }
             $alert_text   = mb_substr( sanitize_text_field( $params['alert_text'] ?? '' ), 0, 100 );
             $alert_active = ! empty( $params['alert_active'] ) ? 1 : 0;
+            $alert_notice = ! empty( $params['alert_notice'] ) ? 1 : 0;
         }
 
         $data = array(
@@ -190,9 +194,10 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'alert_key'          => $alert_key,
             'alert_text'         => $alert_text,
             'alert_active'       => $alert_active,
+            'alert_notice'       => $alert_notice,
         );
 
-        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d' );
+        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d' );
         $inserted = $wpdb->insert( $table, $data, $formats );
 
         if ( false === $inserted ) {
@@ -262,6 +267,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 vl.alert_key,
                 vl.alert_text,
                 vl.alert_active,
+                vl.alert_notice,
                 vl.alert_ack_at,
                 vl.alert_ack_by,
                 (vl.context_image_data IS NOT NULL) AS has_context_img,
@@ -357,6 +363,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
                        WHERE alert_key IS NOT NULL
                        GROUP BY gate_identifier, alert_key ) latest ON latest.id = vl.vehicle_log_id
               WHERE vl.alert_active = 1
+                AND vl.alert_notice = 0
                 AND vl.alert_ack_at IS NULL
               ORDER BY vl.vehicle_log_id ASC",
             ARRAY_A
