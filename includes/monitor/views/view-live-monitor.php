@@ -93,6 +93,16 @@ function fsbhoa_render_live_monitor_view() {
                         <span>Vehicle Gate Traffic</span>
                         <button type="button" id="vehicle-alert-test-sound" title="Play the alert sound, to check the speakers (this also turns the sound on for this page)" style="font-size: 13px; font-weight: normal; padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #1f2937; cursor: pointer;">&#128276; Test sound</button>
                     </h2>
+                    <?php $vehicle_lanes = Fsbhoa_Vehicle_Log_REST_API::monitor_lanes(); ?>
+                    <?php if ( ! empty( $vehicle_lanes ) ) : ?>
+                    <!-- One lane at a time (fsbhoa_monitor_vehicle_lanes; filtered by fsbhoa-vehicle-monitor.js) -->
+                    <div id="vehicle-lane-filter" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;">
+                        <button type="button" data-lane="" class="vehicle-lane-button">All</button>
+                        <?php foreach ( $vehicle_lanes as $lane ) : ?>
+                        <button type="button" data-lane="<?php echo esc_attr( $lane ); ?>" class="vehicle-lane-button"><?php echo esc_html( $lane ); ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
                     <!-- Lane alerts that are on, such as a broken arm (/vehicle-alerts; filled by fsbhoa-vehicle-monitor.js) -->
                     <ul id="vehicle-alert-list" role="alert" style="list-style: none; margin: 0; padding: 0;"></ul>
                     <div class="bg-white rounded-xl shadow-md overflow-hidden">

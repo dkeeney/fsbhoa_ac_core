@@ -192,6 +192,38 @@
            return li;
         }
 
+        // ---- Lane filter: the buttons over the column (one per lane, from the vehicle hardware
+        // plugin) show one lane's cards, or all. The choice is kept per browser. Pinned alerts
+        // are always shown.
+        const laneButtons = Array.from(document.querySelectorAll('#vehicle-lane-filter .vehicle-lane-button'));
+        let currentLane = '';
+        try { currentLane = localStorage.getItem('fsbhoa_vehicle_lane') || ''; } catch (e) { /* no storage */ }
+        if (!laneButtons.some(b => b.dataset.lane === currentLane)) currentLane = '';
+
+        function showsLane(card) {
+           return !currentLane || card.dataset.gate === currentLane;
+        }
+
+        function applyLaneFilter() {
+           laneButtons.forEach(b => {
+              const on = b.dataset.lane === currentLane;
+              b.setAttribute('aria-pressed', on ? 'true' : 'false');
+              b.style.cssText = 'font-size: 13px; padding: 4px 12px; border-radius: 6px; cursor: pointer; border: 1px solid ' +
+                 (on ? '#1d4ed8; background: #1d4ed8; color: #fff; font-weight: 600;' : '#cbd5e1; background: #fff; color: #1f2937;');
+           });
+           Array.from(vehicleEventList.children).forEach(card => {
+              if (card.dataset.gate !== undefined) card.style.display = showsLane(card) ? '' : 'none';
+           });
+        }
+
+        laneButtons.forEach(b => b.addEventListener('click', function() {
+           currentLane = b.dataset.lane;
+           try { localStorage.setItem('fsbhoa_vehicle_lane', currentLane); } catch (e) { /* no storage */ }
+           applyLaneFilter();
+           vehicleEventList.parentElement.scrollTop = 0;
+        }));
+        applyLaneFilter();
+
         function addEvent(event) {
            if (vehiclePlaceholder) {
                vehiclePlaceholder.remove();
@@ -202,6 +234,8 @@
 
            const card = createCard(event);
            card.dataset.at = event.event_timestamp || '';
+           card.dataset.gate = event.gate_identifier || '';
+           if (!showsLane(card)) card.style.display = 'none';
            vehicleEventList.prepend(card);
         }
 

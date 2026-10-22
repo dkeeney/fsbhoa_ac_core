@@ -64,6 +64,26 @@ class Fsbhoa_Vehicle_Log_REST_API {
         return (bool) apply_filters( 'fsbhoa_monitor_show_vehicle_column', false );
     }
 
+    /**
+     * The vehicle lanes the live monitor offers as filter buttons over the vehicle column, in
+     * order, by the names events carry in gate_identifier. Empty (no buttons) unless a vehicle
+     * hardware plugin lists its lanes through the fsbhoa_monitor_vehicle_lanes filter.
+     */
+    public static function monitor_lanes() {
+        $lanes = apply_filters( 'fsbhoa_monitor_vehicle_lanes', array() );
+        if ( ! is_array( $lanes ) ) {
+            return array();
+        }
+        $names = array();
+        foreach ( $lanes as $lane ) {
+            $lane = trim( (string) $lane );
+            if ( '' !== $lane && ! in_array( $lane, $names, true ) ) {
+                $names[] = $lane;
+            }
+        }
+        return $names;
+    }
+
     public function register_routes() {
         // Ingest one finished vehicle event from a vehicle hardware service
         register_rest_route( $this->namespace, '/vehicle-event', array(
