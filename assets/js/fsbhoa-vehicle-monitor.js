@@ -84,7 +84,11 @@
                    ? 'border-left: 4px solid #94a3b8; background: #f8fafc;'
                    : 'border-left: 4px solid #3b82f6; background: #eff6ff;');
 
-           const plate = event.lpr_plate_string || 'NO PLATE';
+           // No plate text: the plate camera saw a vehicle without a readable plate (it sends
+           // its photos), or never read the vehicle at all (a vehicle counted by another camera:
+           // no plate photos).
+           const plate = event.lpr_plate_string ||
+               (isTrue(event.has_lpr_img) || isTrue(event.has_context_img) ? 'NO PLATE' : 'NO PLATE READ');
            const gate = event.gate_identifier || 'Vehicle Gate';
            const authPrefixes = {
                DK_WINDSHIELD: 'Tag ',
