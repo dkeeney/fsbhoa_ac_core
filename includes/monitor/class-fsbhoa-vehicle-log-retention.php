@@ -81,9 +81,9 @@ class Fsbhoa_Vehicle_Log_Retention {
         do {
             $batch = $wpdb->query( $wpdb->prepare(
                 "UPDATE `{$table}`
-                    SET context_image_data = NULL, lpr_image_data = NULL, overview_image_data = NULL
+                    SET context_image_data = NULL, lpr_image_data = NULL, overview_image_data = NULL, note_image_data = NULL
                   WHERE event_timestamp < %s
-                    AND ( context_image_data IS NOT NULL OR lpr_image_data IS NOT NULL OR overview_image_data IS NOT NULL )
+                    AND ( context_image_data IS NOT NULL OR lpr_image_data IS NOT NULL OR overview_image_data IS NOT NULL OR note_image_data IS NOT NULL )
                   LIMIT %d",
                 $cutoff,
                 self::BATCH_SIZE

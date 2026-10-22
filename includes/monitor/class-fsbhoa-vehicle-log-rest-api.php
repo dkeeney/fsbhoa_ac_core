@@ -22,6 +22,9 @@
  *   lpr_image_b64      plate photo, base64 JPEG
  *   context_image_b64  scene photo, base64 JPEG
  *   overview_image_b64 the lane overview camera's photo of the vehicle, base64 JPEG
+ *   event_note         a short note shown on the vehicle's card (up to 100 characters), such
+ *                      as "Arm already up 2 min 56 s"
+ *   note_image_b64     a photo that goes with the note, base64 JPEG
  *   raw_details        any JSON object: the sender's inputs and timings
  *   alert_key          a lane alert instead of a vehicle: its kind (letters, digits, _ and -,
  *                      up to 32), such as arm_broken. One kind per lane is either on or off.
@@ -32,7 +35,7 @@
  * Replies { success, vehicle_log_id[, duplicate] }. 409 for the other environment's event,
  * 503 when this server's environment isn't set.
  *
- * GET /vehicle-recent[?since=<vehicle_log_id>], GET /vehicle-image/<id>?type=lpr|context|overview,
+ * GET /vehicle-recent[?since=<vehicle_log_id>], GET /vehicle-image/<id>?type=lpr|context|overview|note,
  * GET /vehicle-alerts (the lane alerts now on that nobody has acknowledged: each lane and kind
  * whose latest row has alert_active 1, alert_notice 0 and no alert_ack_at) and POST /vehicle-alerts/<id>/ack
  * (staff saw it: records who and when) are for the monitor page (logged-in admin, X-WP-Nonce
@@ -147,6 +150,8 @@ class Fsbhoa_Vehicle_Log_REST_API {
         $context_blob  = ! empty( $params['context_image_b64'] ) ? base64_decode( $params['context_image_b64'] ) : null;
         $lpr_blob      = ! empty( $params['lpr_image_b64'] ) ? base64_decode( $params['lpr_image_b64'] ) : null;
         $overview_blob = ! empty( $params['overview_image_b64'] ) ? base64_decode( $params['overview_image_b64'] ) : null;
+        $note_blob     = ! empty( $params['note_image_b64'] ) ? base64_decode( $params['note_image_b64'] ) : null;
+        $event_note    = mb_substr( sanitize_text_field( $params['event_note'] ?? '' ), 0, 100 );
 
         // event_timestamp is local time (site time zone), like ac_access_log.
         $timestamp = current_time( 'mysql' );
@@ -189,6 +194,8 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'context_image_data' => $context_blob,
             'lpr_image_data'     => $lpr_blob,
             'overview_image_data' => $overview_blob,
+            'note_image_data'    => $note_blob,
+            'event_note'         => '' !== $event_note ? $event_note : null,
             'raw_details'        => $raw_details,
             'event_uid'          => '' !== $event_uid ? $event_uid : null,
             'alert_key'          => $alert_key,
@@ -197,7 +204,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'alert_notice'       => $alert_notice,
         );
 
-        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d' );
+        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d' );
         $inserted = $wpdb->insert( $table, $data, $formats );
 
         if ( false === $inserted ) {
@@ -213,7 +220,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
 
     /**
      * Send a stored photo as JPEG: ?type=lpr for the plate, ?type=overview for the overview
-     * camera's photo, anything else for the scene.
+     * camera's photo, ?type=note for the note's photo, anything else for the scene.
      */
     public function serve_image( WP_REST_Request $request ) {
         global $wpdb;
@@ -223,6 +230,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
         $columns = array(
             'lpr'      => 'lpr_image_data',
             'overview' => 'overview_image_data',
+            'note'     => 'note_image_data',
         );
         $column  = $columns[ $type ] ?? 'context_image_data';
         $table  = self::TABLE;
@@ -273,6 +281,8 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 (vl.context_image_data IS NOT NULL) AS has_context_img,
                 (vl.lpr_image_data IS NOT NULL) AS has_lpr_img,
                 (vl.overview_image_data IS NOT NULL) AS has_overview_img,
+                vl.event_note,
+                (vl.note_image_data IS NOT NULL) AS has_note_img,
                 COALESCE(
                     CASE WHEN vl.auth_type = 'DK_WINDSHIELD' THEN NULLIF(h.primary_cardholder_id, 0) END,
                     NULLIF(cred.cardholder_id, 0),

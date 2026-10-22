@@ -115,6 +115,8 @@
            const lprUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=lpr' + nonceParam;
            const contextUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=context' + nonceParam;
            const overviewUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=overview' + nonceParam;
+           const noteUrl = '/wp-json/fsbhoa/v1/vehicle-image/' + logId + '?type=note' + nonceParam;
+           const hasNote = isTrue(event.has_note_img);
            const hasLpr = isTrue(event.has_lpr_img);
            const hasContext = isTrue(event.has_context_img);
            const hasOverview = isTrue(event.has_overview_img);
@@ -142,6 +144,10 @@
            }
            if (hasOverview) {
                thumbs += thumb(overviewUrl, overviewUrl, gate, 'Click to view the overview camera\'s photo', 'Gate');
+           }
+           // The sender's photo for its note (such as who raised the arm)
+           if (hasNote) {
+               thumbs += thumb(noteUrl, noteUrl, event.event_note || 'Note', 'Click to view the photo for the note', 'Note');
            }
            const imgBox = thumbs ? '<div style="flex-shrink: 0; display: flex; gap: 6px;">' + thumbs + '</div>' : '';
 
@@ -176,6 +182,9 @@
                     (auth ? ' &#x2022; <span style="color: #64748b;">' + esc(auth) + '</span>' : '') +
                   '</div>' +
                   cardholderHtml +
+                  (event.event_note
+                      ? '<div style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-top: 4px; display: inline-block;">' + esc(event.event_note) + '</div>'
+                      : '') +
                   warnBanner +
                '</div>';
            return li;
