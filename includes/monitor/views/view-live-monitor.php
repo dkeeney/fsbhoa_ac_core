@@ -126,6 +126,17 @@ function fsbhoa_render_live_monitor_view() {
                 <!-- Pedestrian Activity (ac_access_log; filled by fsbhoa-live-monitor.js) -->
                 <div id="pedestrian-log-column">
                     <h2 class="text-xl font-semibold mb-4">Pedestrian Gate Access</h2>
+                    <?php $pedestrian_gates = Fsbhoa_Monitor_REST_API::monitor_gates(); ?>
+                    <?php if ( ! empty( $pedestrian_gates ) ) : ?>
+                    <!-- One gate at a time (ac_doors; filtered by fsbhoa-live-monitor.js). More gates than
+                         lanes, so smaller buttons, wrapping to a second row or more -->
+                    <div id="pedestrian-gate-filter" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;">
+                        <button type="button" data-gate="" class="pedestrian-gate-button">All</button>
+                        <?php foreach ( $pedestrian_gates as $gate ) : ?>
+                        <button type="button" data-gate="<?php echo esc_attr( $gate ); ?>" class="pedestrian-gate-button"><?php echo esc_html( $gate ); ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
                     <div class="bg-white rounded-xl shadow-md overflow-hidden">
                         <div id="event-log-container" style="height: 36rem; overflow-y: auto;">
                             <ul id="event-list" class="divide-y divide-gray-200">

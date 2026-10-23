@@ -45,6 +45,16 @@ class Fsbhoa_Monitor_REST_API {
         return (bool) apply_filters( 'fsbhoa_monitor_show_pedestrian_column', false );
     }
 
+    /**
+     * The gates the live monitor offers as filter buttons over the pedestrian column: every
+     * door but the automated tests' (door_role TEST), by name, as events carry it in gateName.
+     */
+    public static function monitor_gates() {
+        global $wpdb;
+        $names = $wpdb->get_col( "SELECT DISTINCT friendly_name FROM ac_doors WHERE door_role <> 'TEST' AND friendly_name <> '' ORDER BY friendly_name" );
+        return is_array( $names ) ? $names : array();
+    }
+
     public function register_routes() {
         // Endpoint for the monitor_service to fetch a single, enriched event by its log ID.
         register_rest_route( $this->namespace, '/monitor/event', array(

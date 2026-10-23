@@ -268,8 +268,42 @@ document.addEventListener('DOMContentLoaded', function () {
                 (<span class="${isGranted ? 'text-green-600' : 'text-red-600'}">${eventData.eventMessage}</span>)
             `;
         }
+        li.dataset.gate = eventData.gateName || '';
+        if (!showsGate(li)) li.style.display = 'none';
         return li;
     }
+
+    // ---- Gate filter: the buttons over the column (one per door) show one gate's events, or
+    // all. The choice is kept per browser.
+    const gateButtons = Array.from(document.querySelectorAll('#pedestrian-gate-filter .pedestrian-gate-button'));
+    let currentGate = '';
+    try { currentGate = localStorage.getItem('fsbhoa_pedestrian_gate') || ''; } catch (e) { /* no storage */ }
+    if (!gateButtons.some(b => b.dataset.gate === currentGate)) currentGate = '';
+
+    function showsGate(card) {
+        return !currentGate || card.dataset.gate === currentGate;
+    }
+
+    function applyGateFilter() {
+        gateButtons.forEach(b => {
+            const on = b.dataset.gate === currentGate;
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            b.style.cssText = 'font-size: 12px; padding: 3px 8px; border-radius: 6px; cursor: pointer; border: 1px solid ' +
+                (on ? '#1d4ed8; background: #1d4ed8; color: #fff; font-weight: 600;' : '#cbd5e1; background: #fff; color: #1f2937;');
+        });
+        if (!eventList) return;
+        Array.from(eventList.children).forEach(card => {
+            if (card.dataset.gate !== undefined) card.style.display = showsGate(card) ? '' : 'none';
+        });
+    }
+
+    gateButtons.forEach(b => b.addEventListener('click', function() {
+        currentGate = b.dataset.gate;
+        try { localStorage.setItem('fsbhoa_pedestrian_gate', currentGate); } catch (e) { /* no storage */ }
+        applyGateFilter();
+        if (eventList) eventList.parentElement.scrollTop = 0;
+    }));
+    applyGateFilter();
 
     function addEventToLog(eventData) {
         console.log("Monitor: Received Event:", eventData);
