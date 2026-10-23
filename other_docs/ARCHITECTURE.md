@@ -78,6 +78,7 @@ After the refresh:
   6. Rebuild and install the event service (`fsbhoa_ac_uhppote/build.sh install`), install the monitor binary (`./rebuild.sh install` in core), rebuild and install the vehicle service (`fsbhoa_ac_vehicle/rebuild.sh install`), rebuild and install the print service (`fsbhoa_ac_zebra/build.sh install`), and restart all the services. The old print service sends its own retired key, so print status updates are refused until it is reinstalled.
   7. Check "Enable Scheduled Sync" in the Event Service settings (on for production), restart the event service, and check the crontab requests `wp-cron.php` at 00:11 and 03:11.
   8. Expect the first DoorKing export to add residents with no photo badge or a disabled one.
+  8a. Create the Vehicle Log report's page (a page with the `[fsbhoa_vehicle_report]` shortcode, slug `vehicle-log`) and add it to the main menu under Access Control after Access Log Reports, as on the testbed (2026-10-22).
   9. Watch the sync log (`wp-content/debug.log`) for `timed out`, `had issues`, `SYNC FAILED` and `did not answer`, and the Discord channel for sync alerts.
 - **Migration script to set `FSBHOA_AC_ENVIRONMENT` on production.** Production's `wp-config.php` must get `define( 'FSBHOA_AC_ENVIRONMENT', 'production' );` as part of deployment, not by hand.
   - It belongs with the deployment tooling (`~/deploy-production.sh` or this core plugin).

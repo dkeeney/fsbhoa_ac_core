@@ -154,6 +154,7 @@ require_once FSBHOA_AC_PLUGIN_DIR . 'includes/reports/class-fsbhoa-reports-admin
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/reports/class-fsbhoa-reports-rest-api.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/reports/class-fsbhoa-reports-actions.php';
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/reports/class-fsbhoa-analytics-admin-page.php';
+require_once FSBHOA_AC_PLUGIN_DIR . 'includes/reports/class-fsbhoa-vehicle-report.php';
 
 // --- Amenities ---
 require_once FSBHOA_AC_PLUGIN_DIR . 'includes/admin/class-fsbhoa-amenity-admin-page.php';
@@ -211,6 +212,11 @@ function run_fsbhoa_action_handlers() {
     // Instantiate report actions handler
     if (class_exists('Fsbhoa_Reports_Actions')) {
         new Fsbhoa_Reports_Actions();
+    }
+
+    // Vehicle Log report: its REST route and CSV exports
+    if (class_exists('Fsbhoa_Vehicle_Report')) {
+        new Fsbhoa_Vehicle_Report();
     }
 
     // Instantiate Archive Cardholder ACTIONS handler

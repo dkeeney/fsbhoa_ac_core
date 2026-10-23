@@ -12,6 +12,7 @@ class Fsbhoa_Shortcodes {
         add_shortcode( 'fsbhoa_cardholder_management', array( $this, 'render_cardholder_management_shortcode' ) );
         add_shortcode( 'fsbhoa_live_monitor', array( $this, 'render_live_monitor_shortcode' ) );
         add_shortcode( 'fsbhoa_reports', array( $this, 'render_reports_shortcode' ) );
+        add_shortcode( 'fsbhoa_vehicle_report', array( $this, 'render_vehicle_report_shortcode' ) );
         add_shortcode( 'fsbhoa_usage_analytics', array( $this, 'render_analytics_shortcode' ) );
         add_shortcode( 'fsbhoa_cardholder_report', array( $this, 'render_cardholder_report_shortcode' ) );
         add_shortcode( 'fsbhoa_task_list', array( $this, 'render_task_list_shortcode' ) );
@@ -151,6 +152,24 @@ class Fsbhoa_Shortcodes {
             wp_enqueue_script($script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-reports-admin.js', array('jquery', 'datatables-script', 'jquery-ui-datepicker', 'datatables-select'), FSBHOA_AC_PLUGIN_VERSION, true);
 
             // Localize data for the reports script
+            wp_localize_script($script_handle, 'fsbhoa_reports_vars', array(
+                'rest_nonce' => wp_create_nonce( 'wp_rest' ),
+                'export_nonce' => wp_create_nonce( 'fsbhoa_export_nonce' )
+            ));
+        }
+
+
+        // ASSETS FOR: [fsbhoa_vehicle_report] (the same table, filters and styles as [fsbhoa_reports])
+        if ( has_shortcode( $post->post_content, 'fsbhoa_vehicle_report' ) ) {
+            wp_enqueue_style('datatables-style', FSBHOA_AC_PLUGIN_URL . 'assets/vendor/dataTables.dataTables.css', array(), '2.0.8');
+            wp_enqueue_script('datatables-script', FSBHOA_AC_PLUGIN_URL . 'assets/vendor/dataTables.js', array('jquery'), '2.0.8', true);
+            wp_enqueue_style('datatables-select-css', FSBHOA_AC_PLUGIN_URL . 'assets/vendor/select.dataTables.css', ['datatables-style']);
+            wp_enqueue_script('datatables-select', FSBHOA_AC_PLUGIN_URL . 'assets/vendor/dataTables.select.js', ['jquery', 'datatables-script'], '2.0.2', true);
+            wp_enqueue_style('fsbhoa-reports-styles', FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-reports-styles.css', array('fsbhoa-shared-styles'), FSBHOA_AC_PLUGIN_VERSION);
+
+            $script_handle = 'fsbhoa-vehicle-report';
+            $report_js = 'assets/js/fsbhoa-vehicle-report.js';
+            wp_enqueue_script($script_handle, FSBHOA_AC_PLUGIN_URL . $report_js, array('jquery', 'datatables-script', 'datatables-select'), (string) filemtime(FSBHOA_AC_PLUGIN_DIR . $report_js), true);
             wp_localize_script($script_handle, 'fsbhoa_reports_vars', array(
                 'rest_nonce' => wp_create_nonce( 'wp_rest' ),
                 'export_nonce' => wp_create_nonce( 'fsbhoa_export_nonce' )
@@ -378,6 +397,16 @@ class Fsbhoa_Shortcodes {
             echo '<p>' . esc_html__( 'Error: Reports class not found.', 'fsbhoa-ac' ) . '</p>';
         }
 
+        return ob_get_clean();
+    }
+
+    public function render_vehicle_report_shortcode( $atts ) {
+        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            return '<p>' . esc_html__( 'You do not have sufficient permissions.', 'fsbhoa-ac' ) . '</p>';
+        }
+
+        ob_start();
+        Fsbhoa_Vehicle_Report::render_page();
         return ob_get_clean();
     }
 
