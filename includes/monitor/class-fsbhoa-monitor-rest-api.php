@@ -46,12 +46,22 @@ class Fsbhoa_Monitor_REST_API {
     }
 
     /**
-     * The gates the live monitor offers as filter buttons over the pedestrian column: every
-     * door but the automated tests' (door_role TEST), by name, as events carry it in gateName.
+     * The gates the live monitor offers as filter buttons over the pedestrian column: the doors
+     * with events in the monitor's history, by name, as events carry it in gateName. Not the
+     * automated tests' (door_role TEST), nor the QR lighting gates (controller 900001, the
+     * courts: their events record a lighting request, seen under All).
      */
     public static function monitor_gates() {
         global $wpdb;
-        $names = $wpdb->get_col( "SELECT DISTINCT friendly_name FROM ac_doors WHERE door_role <> 'TEST' AND friendly_name <> '' ORDER BY friendly_name" );
+        $names = $wpdb->get_col( "
+            SELECT DISTINCT d.friendly_name
+            FROM ac_access_log l
+            JOIN ac_controllers c ON l.controller_identifier = c.uhppoted_device_id
+            JOIN ac_doors d ON c.controller_record_id = d.controller_record_id AND l.door_number = d.door_number_on_controller
+            WHERE l.event_timestamp >= NOW() - INTERVAL " . self::history_hours() . " HOUR
+              AND d.door_role <> 'TEST' AND d.friendly_name <> '' AND c.uhppoted_device_id <> '900001'
+            ORDER BY d.friendly_name
+        " );
         return is_array( $names ) ? $names : array();
     }
 
