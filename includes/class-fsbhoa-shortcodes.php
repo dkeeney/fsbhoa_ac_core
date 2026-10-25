@@ -231,7 +231,7 @@ class Fsbhoa_Shortcodes {
                 $vehicle_js = 'assets/js/fsbhoa-vehicle-monitor.js';
                 wp_enqueue_script('fsbhoa-vehicle-monitor-js', FSBHOA_AC_PLUGIN_URL . $vehicle_js, [], (string) filemtime(FSBHOA_AC_PLUGIN_DIR . $vehicle_js), true);
                 // The vehicle routes require a logged-in admin; WordPress needs the nonce to recognize the user.
-                wp_localize_script('fsbhoa-vehicle-monitor-js', 'fsbhoa_vehicle_vars', [ 'nonce' => wp_create_nonce('wp_rest'), 'history_hours' => Fsbhoa_Monitor_REST_API::history_hours() ]);
+                wp_localize_script('fsbhoa-vehicle-monitor-js', 'fsbhoa_vehicle_vars', [ 'nonce' => wp_create_nonce('wp_rest'), 'history_hours' => Fsbhoa_Monitor_REST_API::history_hours(), 'video' => Fsbhoa_Vehicle_Log_REST_API::monitor_video() ]);
             }
         }
 

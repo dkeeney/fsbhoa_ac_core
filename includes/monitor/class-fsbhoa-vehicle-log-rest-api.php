@@ -85,6 +85,34 @@ class Fsbhoa_Vehicle_Log_REST_API {
     }
 
     /**
+     * Recorded video for the vehicle column's cards: a Video button on each card whose lane has
+     * cameras, playing them from just before the card's time. Off unless a vehicle hardware
+     * plugin offers it through the fsbhoa_monitor_vehicle_video filter, returning
+     * array( 'url' => <a GET route taking camera, at, before, length and quality, answering
+     * with an MP4 a browser plays as it arrives>, 'lanes' => array( <lane name> =>
+     * array( array( 'id' => <camera id for the route>, 'label' => <button text> ), ... ) ) ).
+     * Returns that, checked, or an empty array.
+     */
+    public static function monitor_video() {
+        $video = apply_filters( 'fsbhoa_monitor_vehicle_video', array() );
+        if ( ! is_array( $video ) || empty( $video['url'] ) || empty( $video['lanes'] ) || ! is_array( $video['lanes'] ) ) {
+            return array();
+        }
+        $lanes = array();
+        foreach ( $video['lanes'] as $lane => $cameras ) {
+            foreach ( (array) $cameras as $camera ) {
+                if ( is_array( $camera ) && '' !== (string) ( $camera['id'] ?? '' ) ) {
+                    $lanes[ (string) $lane ][] = array(
+                        'id'    => (string) $camera['id'],
+                        'label' => (string) ( $camera['label'] ?? $camera['id'] ),
+                    );
+                }
+            }
+        }
+        return $lanes ? array( 'url' => esc_url_raw( $video['url'] ), 'lanes' => $lanes ) : array();
+    }
+
+    /**
      * The cardholder each event's credential belongs to, for a SELECT over ac_vehicle_log vl
      * with credential_joins_sql(): cardholder_id, cardholder_name and credential_matches (how
      * many active credentials share the value). A windshield tag names its household's

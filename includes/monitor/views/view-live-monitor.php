@@ -169,6 +169,21 @@ function fsbhoa_render_live_monitor_view() {
                 </div>
             </div>
         </div>
+        <!-- A card's recorded video (fsbhoa_monitor_vehicle_video; played by fsbhoa-vehicle-monitor.js) -->
+        <div id="fsbhoa-vehicle-video-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99999; justify-content: center; align-items: center; padding: 20px;">
+            <div style="width: min(1280px, 92vw); text-align: center; color: #fff;">
+                <div id="fsbhoa-video-title" style="font-size: 16px; font-weight: 600; margin-bottom: 8px;"></div>
+                <div id="fsbhoa-video-cameras" style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px;"></div>
+                <video id="fsbhoa-video-player" controls autoplay muted playsinline style="width: 100%; max-height: 72vh; background: #000; border-radius: 8px;"></video>
+                <div id="fsbhoa-video-status" style="font-size: 13px; color: #cbd5e1; margin-top: 6px; min-height: 18px;"></div>
+                <div style="margin-top: 8px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;">
+                    <button type="button" class="button" data-video-shift="-30">&#9664; 30 s earlier</button>
+                    <button type="button" class="button" data-video-shift="30">30 s later &#9654;</button>
+                    <button type="button" class="button" id="fsbhoa-video-quality">Sharper</button>
+                    <button type="button" class="button" id="fsbhoa-video-close">Close</button>
+                </div>
+            </div>
+        </div>
         <?php endif; ?>
         <?php
         // Extension plugins add their own overlays (lightboxes, dialogs) here.
