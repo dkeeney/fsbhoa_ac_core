@@ -174,6 +174,7 @@ class Fsbhoa_Shortcodes {
                 'rest_nonce' => wp_create_nonce( 'wp_rest' ),
                 'export_nonce' => wp_create_nonce( 'fsbhoa_export_nonce' )
             ));
+            self::enqueue_vehicle_video();
         }
 
 
@@ -231,7 +232,8 @@ class Fsbhoa_Shortcodes {
                 $vehicle_js = 'assets/js/fsbhoa-vehicle-monitor.js';
                 wp_enqueue_script('fsbhoa-vehicle-monitor-js', FSBHOA_AC_PLUGIN_URL . $vehicle_js, [], (string) filemtime(FSBHOA_AC_PLUGIN_DIR . $vehicle_js), true);
                 // The vehicle routes require a logged-in admin; WordPress needs the nonce to recognize the user.
-                wp_localize_script('fsbhoa-vehicle-monitor-js', 'fsbhoa_vehicle_vars', [ 'nonce' => wp_create_nonce('wp_rest'), 'history_hours' => Fsbhoa_Monitor_REST_API::history_hours(), 'video' => Fsbhoa_Vehicle_Log_REST_API::monitor_video() ]);
+                wp_localize_script('fsbhoa-vehicle-monitor-js', 'fsbhoa_vehicle_vars', [ 'nonce' => wp_create_nonce('wp_rest'), 'history_hours' => Fsbhoa_Monitor_REST_API::history_hours() ]);
+                self::enqueue_vehicle_video();
             }
         }
 
@@ -398,6 +400,21 @@ class Fsbhoa_Shortcodes {
         }
 
         return ob_get_clean();
+    }
+
+    /**
+     * The Video button's player (assets/js/fsbhoa-vehicle-video.js), for the monitor's vehicle
+     * cards and the Vehicle Log report, when a vehicle hardware plugin offers recorded video
+     * (fsbhoa_monitor_vehicle_video). Nothing otherwise.
+     */
+    private static function enqueue_vehicle_video() {
+        $video = Fsbhoa_Vehicle_Log_REST_API::monitor_video();
+        if ( empty( $video ) ) {
+            return;
+        }
+        $video_js = 'assets/js/fsbhoa-vehicle-video.js';
+        wp_enqueue_script( 'fsbhoa-vehicle-video', FSBHOA_AC_PLUGIN_URL . $video_js, array(), (string) filemtime( FSBHOA_AC_PLUGIN_DIR . $video_js ), true );
+        wp_localize_script( 'fsbhoa-vehicle-video', 'fsbhoa_vehicle_video', array_merge( $video, array( 'nonce' => wp_create_nonce( 'wp_rest' ) ) ) );
     }
 
     public function render_vehicle_report_shortcode( $atts ) {

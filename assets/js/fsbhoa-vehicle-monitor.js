@@ -12,9 +12,6 @@
         let lastKnownId = 0;
         // How far back the column goes (the Monitor History setting)
         const historyHours = parseInt(window.fsbhoa_vehicle_vars && window.fsbhoa_vehicle_vars.history_hours, 10) || 24;
-        // Recorded video, when the vehicle hardware plugin offers it: { url, lanes: { <lane>: [{ id, label }] } }
-        const video = (window.fsbhoa_vehicle_vars && window.fsbhoa_vehicle_vars.video) || {};
-        const videoLanes = video.lanes || {};
 
         // Escape text from the server before it goes into innerHTML.
         function esc(value) {
@@ -76,12 +73,9 @@
            return li;
         }
 
-        // The Video button for a card whose lane has cameras with recordings
+        // The Video button for a card whose lane has cameras with recordings (fsbhoa-vehicle-video.js)
         function videoButton(event) {
-           if (!video.url || !videoLanes[event.gate_identifier] || !event.event_timestamp) return '';
-           return '<button type="button" data-video-gate="' + esc(event.gate_identifier) + '" data-video-at="' + esc(event.event_timestamp) + '"' +
-              ' style="margin-top: 6px; font-size: 12px; padding: 2px 10px; border-radius: 4px; border: 1px solid #94a3b8; background: #fff; color: #1f2937; cursor: pointer;"' +
-              ' title="Play the lane\'s cameras from just before this moment">&#9654; Video</button>';
+           return window.fsbhoaVehicleVideo ? window.fsbhoaVehicleVideo.button(event.gate_identifier, event.event_timestamp) : '';
         }
 
         function ackNote(event) {
@@ -484,99 +478,6 @@
         setInterval(function() {
            if (activeAlerts.length > 0) playAlarm();
         }, 15000);
-
-        // ---- Recorded video: the lane's cameras from 15 s before the card's time, a minute at a
-        // time, played as it arrives (the server fetches it from the NVR). One camera at a time;
-        // buttons switch camera, move 30 s earlier or later, or ask for the sharper stream.
-        const videoModal = document.getElementById('fsbhoa-vehicle-video-modal');
-        const player = document.getElementById('fsbhoa-video-player');
-        const videoStatus = document.getElementById('fsbhoa-video-status');
-        const videoBefore = 15;
-        const videoLength = 60;
-        let playing = null; // { gate, at, camera, shift, quality }
-
-        function pad(n) { return (n < 10 ? '0' : '') + n; }
-        function localStamp(d) {
-           return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' +
-              pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-        }
-
-        function videoUrl() {
-           const params = new URLSearchParams({
-              camera: playing.camera.id,
-              at: playing.at.substring(0, 19),
-              before: String(videoBefore - playing.shift),
-              length: String(videoLength),
-              quality: playing.quality,
-              _wpnonce: nonce
-           });
-           return video.url + (video.url.indexOf('?') < 0 ? '?' : '&') + params.toString();
-        }
-
-        function playVideo() {
-           const cameras = videoLanes[playing.gate] || [];
-           const start = new Date(new Date(playing.at.substring(0, 19).replace(' ', 'T')).getTime() + (playing.shift - videoBefore) * 1000);
-           document.getElementById('fsbhoa-video-title').textContent =
-              playing.gate + ' \u2022 ' + playing.camera.label + ' \u2022 from ' + formatTime(localStamp(start)) +
-              (playing.quality === 'sharp' ? ' \u2022 sharper' : '');
-           const box = document.getElementById('fsbhoa-video-cameras');
-           box.innerHTML = cameras.map(function(c, i) {
-              const on = c.id === playing.camera.id;
-              return '<button type="button" class="button" data-video-camera="' + i + '" style="' +
-                 (on ? 'background: #1d4ed8; color: #fff; border-color: #1d4ed8; font-weight: 600;' : '') + '">' + esc(c.label) + '</button>';
-           }).join('');
-           document.getElementById('fsbhoa-video-quality').textContent = playing.quality === 'sharp' ? 'Normal size' : 'Sharper';
-           videoStatus.textContent = 'Loading from the recorder\u2026 (the video plays at normal speed as it arrives)';
-           player.src = videoUrl();
-           player.play().catch(function() { /* autoplay refused: the controls are there */ });
-        }
-
-        function stopVideo() {
-           player.pause();
-           player.removeAttribute('src');
-           player.load(); // closes the connection, which stops the server's conversion
-        }
-
-        if (videoModal && player) {
-           player.addEventListener('playing', function() { videoStatus.textContent = ''; });
-           player.addEventListener('error', function() {
-              if (!playing || !player.getAttribute('src')) return;
-              // Ask again for the server's reason (it answers at once when there is no video)
-              const ask = new AbortController();
-              fetch(videoUrl(), { signal: ask.signal }).then(function(r) {
-                 if (r.ok) { ask.abort(); return ''; } // video after all: don't download it twice
-                 return r.text();
-              }).then(function(reason) {
-                 videoStatus.textContent = 'No video: ' + (reason || 'the browser could not play it');
-              }).catch(function() { videoStatus.textContent = 'No video: the server did not answer'; });
-           });
-           document.addEventListener('click', function(e) {
-              const b = e.target && e.target.closest ? e.target.closest('[data-video-gate]') : null;
-              if (!b) return;
-              const cameras = videoLanes[b.dataset.videoGate] || [];
-              if (!cameras.length) return;
-              playing = { gate: b.dataset.videoGate, at: b.dataset.videoAt, camera: cameras[0], shift: 0, quality: '' };
-              videoModal.style.display = 'flex';
-              playVideo();
-           });
-           videoModal.addEventListener('click', function(e) {
-              const t = e.target;
-              if (t === videoModal || t.id === 'fsbhoa-video-close') {
-                 stopVideo();
-                 videoModal.style.display = 'none';
-                 playing = null;
-              } else if (t.dataset.videoCamera !== undefined) {
-                 playing.camera = (videoLanes[playing.gate] || [])[parseInt(t.dataset.videoCamera, 10)] || playing.camera;
-                 playVideo();
-              } else if (t.dataset.videoShift !== undefined) {
-                 playing.shift += parseInt(t.dataset.videoShift, 10);
-                 playVideo();
-              } else if (t.id === 'fsbhoa-video-quality') {
-                 playing.quality = playing.quality === 'sharp' ? '' : 'sharp';
-                 playVideo();
-              }
-           });
-        }
 
         window.openVehicleScene = function(src) {
            const modal = document.getElementById('fsbhoa-vehicle-modal');

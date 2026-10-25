@@ -50,6 +50,11 @@ jQuery(document).ready(function($) {
         if (row.vehicle_desc) {
             html += '<div style="font-size: 11px; color: #475569; margin-top: 3px; max-width: 260px;" title="The plate camera\'s description">' + esc(row.vehicle_desc) + '</div>';
         }
+        // The lane's recorded video from just before the row's time (fsbhoa-vehicle-video.js)
+        if (window.fsbhoaVehicleVideo) {
+            const button = window.fsbhoaVehicleVideo.button(row.gate_identifier, row.event_timestamp);
+            if (button) html += '<div>' + button + '</div>';
+        }
         return html;
     }
 

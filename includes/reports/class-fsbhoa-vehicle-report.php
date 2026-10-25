@@ -66,8 +66,9 @@ class Fsbhoa_Vehicle_Report {
 
     /**
      * The WHERE clause for the filters (each optional): start_date and end_date (YYYY-MM-DD,
-     * whole days, local time), lane, kind ('vehicles' or 'alerts') and search (plate, lane,
-     * credential, cardholder, note or alert text).
+     * whole days, local time), lane, kind ('vehicles', 'no_plate': vehicles without plate text,
+     * the cards' NO PLATE and NO PLATE READ, or 'alerts') and search (plate, vehicle description,
+     * lane, credential, cardholder, note or alert text).
      */
     private static function where_sql( $filters ) {
         global $wpdb;
@@ -89,6 +90,8 @@ class Fsbhoa_Vehicle_Report {
         $kind = isset( $filters['kind'] ) ? $filters['kind'] : '';
         if ( 'vehicles' === $kind ) {
             $where[] = "(vl.alert_key IS NULL OR vl.alert_key = '')";
+        } elseif ( 'no_plate' === $kind ) {
+            $where[] = "(vl.alert_key IS NULL OR vl.alert_key = '') AND (vl.lpr_plate_string IS NULL OR vl.lpr_plate_string = '')";
         } elseif ( 'alerts' === $kind ) {
             $where[] = "vl.alert_key <> ''";
         }
@@ -266,12 +269,13 @@ class Fsbhoa_Vehicle_Report {
                     <select id="vehicle_kind">
                         <option value=""><?php esc_html_e( 'Everything', 'fsbhoa-ac' ); ?></option>
                         <option value="vehicles"><?php esc_html_e( 'Vehicles', 'fsbhoa-ac' ); ?></option>
+                        <option value="no_plate"><?php esc_html_e( 'Vehicles without a plate', 'fsbhoa-ac' ); ?></option>
                         <option value="alerts"><?php esc_html_e( 'Alerts and notices', 'fsbhoa-ac' ); ?></option>
                     </select>
                 </div>
                 <div class="filter-group search-group">
                     <label for="vehicle-live-search"><?php esc_html_e( 'Live Search:', 'fsbhoa-ac' ); ?></label>
-                    <input type="text" id="vehicle-live-search" placeholder="Plate, lane, credential, cardholder, note...">
+                    <input type="text" id="vehicle-live-search" placeholder="Plate, vehicle, lane, credential, cardholder, note...">
                 </div>
                 <div class="filter-group checkbox-group">
                     <label for="vehicle-show-photos">Photos</label>
