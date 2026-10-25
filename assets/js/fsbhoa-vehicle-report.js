@@ -45,7 +45,12 @@ jQuery(document).ready(function($) {
         let html = row.alert_key ? '' : photo(row, plateType, plateFull, 'Plate');
         html += photo(row, 'overview', 'overview', 'Gate');
         if (row.event_note || isTrue(row.has_note_img)) html += photo(row, 'note', 'note', 'Note');
-        return '<div style="display: flex; gap: 6px;">' + html + '</div>';
+        html = '<div style="display: flex; gap: 6px;">' + html + '</div>';
+        // What the plate camera made of a vehicle it read no plate for, under the photos
+        if (row.vehicle_desc) {
+            html += '<div style="font-size: 11px; color: #475569; margin-top: 3px; max-width: 260px;" title="The plate camera\'s description">' + esc(row.vehicle_desc) + '</div>';
+        }
+        return html;
     }
 
     function renderPlate(data, type, row) {

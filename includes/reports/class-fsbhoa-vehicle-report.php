@@ -30,7 +30,7 @@ class Fsbhoa_Vehicle_Report {
         6 => 'cardholder_name',
     );
 
-    private const CSV_HEADER = array( 'Timestamp', 'Lane', 'Direction', 'Plate', 'Credential Type', 'Credential', 'Cardholder', 'Note', 'Alert', 'Without Credential' );
+    private const CSV_HEADER = array( 'Timestamp', 'Lane', 'Direction', 'Plate', 'Vehicle', 'Credential Type', 'Credential', 'Cardholder', 'Note', 'Alert', 'Without Credential' );
 
     public function __construct() {
         add_action( 'rest_api_init', array( $this, 'register_routes' ) );
@@ -99,8 +99,8 @@ class Fsbhoa_Vehicle_Report {
                 "(vl.lpr_plate_string LIKE %s OR vl.gate_identifier LIKE %s OR vl.auth_id LIKE %s
                   OR CONCAT(c_direct.first_name, ' ', c_direct.last_name) LIKE %s
                   OR CONCAT(c_primary.first_name, ' ', c_primary.last_name) LIKE %s
-                  OR vl.event_note LIKE %s OR vl.alert_text LIKE %s)",
-                $like, $like, $like, $like, $like, $like, $like
+                  OR vl.event_note LIKE %s OR vl.alert_text LIKE %s OR vl.vehicle_desc LIKE %s)",
+                $like, $like, $like, $like, $like, $like, $like, $like
             );
         }
         return $where ? ' WHERE ' . implode( ' AND ', $where ) : '';
@@ -110,7 +110,7 @@ class Fsbhoa_Vehicle_Report {
         return "SELECT vl.vehicle_log_id, vl.event_timestamp, vl.gate_identifier, vl.direction,
                 vl.auth_id, vl.auth_type, vl.lpr_plate_string, vl.is_circumvention,
                 vl.alert_key, vl.alert_text, vl.alert_active, vl.alert_notice, vl.alert_ack_at, vl.alert_ack_by,
-                vl.event_note, vl.has_context_img, vl.has_lpr_img, vl.has_overview_img, vl.has_note_img,
+                vl.event_note, vl.vehicle_desc, vl.has_context_img, vl.has_lpr_img, vl.has_overview_img, vl.has_note_img,
                 " . Fsbhoa_Vehicle_Log_REST_API::cardholder_fields_sql() . "
                 FROM " . Fsbhoa_Vehicle_Log_REST_API::TABLE . " vl " . Fsbhoa_Vehicle_Log_REST_API::credential_joins_sql();
     }
@@ -174,6 +174,7 @@ class Fsbhoa_Vehicle_Report {
             $row['gate_identifier'],
             $row['direction'],
             $row['lpr_plate_string'],
+            $row['vehicle_desc'],
             $row['auth_type'],
             $row['auth_id'],
             $row['cardholder_name'],

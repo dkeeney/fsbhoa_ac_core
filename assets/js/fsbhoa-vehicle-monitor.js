@@ -163,7 +163,11 @@
            if (hasNote) {
                thumbs += thumb(noteUrl, noteUrl, event.event_note || 'Note', 'Click to view the photo for the note', 'Note');
            }
-           const imgBox = thumbs ? '<div style="flex-shrink: 0; display: flex; gap: 6px;">' + thumbs + '</div>' : '';
+           // What the plate camera made of a vehicle it read no plate for, in a row under the photos
+           const desc = event.vehicle_desc
+               ? '<div style="font-size: 11px; color: #475569; margin-top: 3px; max-width: 260px;" title="The plate camera\'s description">' + esc(event.vehicle_desc) + '</div>'
+               : '';
+           const imgBox = thumbs ? '<div style="flex-shrink: 0;"><div style="display: flex; gap: 6px;">' + thumbs + '</div>' + desc + '</div>' : '';
 
            // When a credential value belongs to more than one person (such as a shared
            // household PIN), the server picks one; say how many others there are.

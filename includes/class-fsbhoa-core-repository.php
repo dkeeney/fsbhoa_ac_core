@@ -374,6 +374,7 @@ class Fsbhoa_Core_Repository {
             `raw_details` json DEFAULT NULL COMMENT 'Hardware inputs and timings, as sent by the vehicle service',
             `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
             `event_note` varchar(100) DEFAULT NULL COMMENT 'A short note shown on the card, such as: Arm already up 2 min 56 s',
+            `vehicle_desc` varchar(100) DEFAULT NULL COMMENT 'The camera''s description of a vehicle it read no plate for, such as: grey 2017 Lincoln MKC (suv)',
             `event_uid` varchar(64) DEFAULT NULL COMMENT 'Sender event ID; stops a retried post being stored twice',
             `alert_key` varchar(32) DEFAULT NULL COMMENT 'A lane alert''s kind (such as arm_broken); NULL for a vehicle',
             `alert_text` varchar(100) DEFAULT NULL COMMENT 'What the monitor shows for the alert',

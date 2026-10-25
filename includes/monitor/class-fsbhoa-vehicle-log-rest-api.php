@@ -25,6 +25,8 @@
  *   event_note         a short note shown on the vehicle's card (up to 100 characters), such
  *                      as "Arm already up 2 min 56 s"
  *   note_image_b64     a photo that goes with the note, base64 JPEG
+ *   vehicle_desc       what the camera made of a vehicle it read no plate for (up to 100
+ *                      characters), such as "grey 2017 Lincoln MKC (suv)"; shown under the photos
  *   raw_details        any JSON object: the sender's inputs and timings
  *   alert_key          a lane alert instead of a vehicle: its kind (letters, digits, _ and -,
  *                      up to 32), such as arm_broken. One kind per lane is either on or off.
@@ -257,6 +259,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
         $overview_blob = ! empty( $params['overview_image_b64'] ) ? base64_decode( $params['overview_image_b64'] ) : null;
         $note_blob     = ! empty( $params['note_image_b64'] ) ? base64_decode( $params['note_image_b64'] ) : null;
         $event_note    = mb_substr( sanitize_text_field( $params['event_note'] ?? '' ), 0, 100 );
+        $vehicle_desc  = mb_substr( sanitize_text_field( $params['vehicle_desc'] ?? '' ), 0, 100 );
 
         // event_timestamp is local time (site time zone), like ac_access_log.
         $timestamp = current_time( 'mysql' );
@@ -301,6 +304,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'overview_image_data' => $overview_blob,
             'note_image_data'    => $note_blob,
             'event_note'         => '' !== $event_note ? $event_note : null,
+            'vehicle_desc'       => '' !== $vehicle_desc ? $vehicle_desc : null,
             'raw_details'        => $raw_details,
             'event_uid'          => '' !== $event_uid ? $event_uid : null,
             'alert_key'          => $alert_key,
@@ -315,7 +319,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
             'has_note_img'       => ! empty( $note_blob ) ? 1 : 0,
         );
 
-        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%d' );
+        $formats  = array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%d' );
         $inserted = $wpdb->insert( $table, $data, $formats );
 
         if ( false === $inserted ) {
@@ -394,6 +398,7 @@ class Fsbhoa_Vehicle_Log_REST_API {
                 vl.has_overview_img,
                 vl.event_note,
                 vl.has_note_img,
+                vl.vehicle_desc,
                 " . self::cardholder_fields_sql() . "
         ";
 
