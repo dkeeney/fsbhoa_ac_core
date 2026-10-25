@@ -214,7 +214,7 @@ echo "" > "$LOGROTATE_CONFIG_FILE"
 add_log_to_rotate() {
   local config_file=$1
   local json_key=$2
-  local owner=$3 # The user:group that owns the log file, e.g., fsbhoa:fsbhoa
+  local owner=$3 # The user and group that own the log file and its folder, e.g., "fsbhoa fsbhoa" (logrotate needs a space, not a colon)
 
   if [ -f "$config_file" ]; then
     # Use jq to extract the log file path, ignore if null or empty
@@ -232,7 +232,7 @@ $log_path {
     delaycompress
     missingok
     copytruncate
-    create 644 $owner
+    su $owner
 }
 EOT
     fi
@@ -240,8 +240,8 @@ EOT
 }
 
 # Process each service's log file
-add_log_to_rotate "$EVENT_CONFIG_FILE" "logFile" "fsbhoa:fsbhoa"
-add_log_to_rotate "$KIOSK_CONFIG_FILE" "log_file" "fsbhoa:fsbhoa"
+add_log_to_rotate "$EVENT_CONFIG_FILE" "logFile" "fsbhoa fsbhoa"
+add_log_to_rotate "$KIOSK_CONFIG_FILE" "log_file" "fsbhoa fsbhoa"
 
 echo "Logrotate config written to $LOGROTATE_CONFIG_FILE"
 '''
