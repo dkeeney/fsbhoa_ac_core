@@ -24,8 +24,12 @@ class Fsbhoa_Uhppote_Bulk_Sync {
 
     /**
      * Executes the bulk load-acl process for a single controller.
+     * @param bool $allow_wipe false for a controller that failed the sync's health check: a failed
+     *                         attempt is retried without the recovery wipe, and a load that leaves
+     *                         the table out of order isn't re-sorted, so the controller is never
+     *                         left empty by a wipe it can't be reloaded after.
      */
-    public function execute_bulk_load($device_id, $controller_record_id, $cardholders_to_sync, $global_card_perms, $is_dry_run) {
+    public function execute_bulk_load($device_id, $controller_record_id, $cardholders_to_sync, $global_card_perms, $is_dry_run, $allow_wipe = true) {
         global $wpdb;
 
         $controller_ip = fsbhoa_get_controller_ip($device_id);
@@ -198,7 +202,12 @@ class Fsbhoa_Uhppote_Bulk_Sync {
                     $clean_output = trim(preg_replace('/\s+/', ' ', (string)$output));
                     error_log("SYNC WARNING: Bulk ACL attempt {$attempt}/3 for {$device_id} had issues: {$clean_output}");
 
-                    if ($attempt < 3) {
+                    if ($attempt < 3 && !$allow_wipe) {
+                        // The loader writes only what differs, so a retry picks up where this one stopped.
+                        error_log("SYNC RECOVERY: load-acl failed on {$device_id}, which failed the health check. Retrying without a wipe (attempt " . ($attempt + 1) . ")...");
+                        sleep(self::WIPE_SETTLE);
+                        continue;
+                    } elseif ($attempt < 3) {
                         // RECOVERY ONLY: Attempt 1 failed. Protect NVRAM by only clearing on retry (attempts 2 & 3).
                         error_log("SYNC RECOVERY: load-acl failed. Wiping controller {$device_id} memory before attempt " . ($attempt + 1) . "...");
                         $needs_wipe = true;
@@ -224,7 +233,9 @@ class Fsbhoa_Uhppote_Bulk_Sync {
                     $deleted   = (int)$counts[4];
                     $had_cards = $unchanged > 0 || $updated > 0 || $deleted > 0;
 
-                    if ($had_cards && ($added > 0 || $updated > 0 || $deleted > 0)) {
+                    if ($had_cards && ($added > 0 || $updated > 0 || $deleted > 0) && !$allow_wipe) {
+                        error_log("SYNC RESORT SKIPPED: {$device_id} failed the health check, so its card table is left as loaded (added {$added} / updated {$updated} / deleted {$deleted}). The next healthy nightly rebuilds it in order.");
+                    } elseif ($had_cards && ($added > 0 || $updated > 0 || $deleted > 0)) {
                         error_log("SYNC RESORT: load-acl for {$device_id} added {$added} / updated {$updated} / deleted {$deleted} cards in a populated table ({$clean_output}). Wiping and reloading to keep the card table sorted...");
                         $needs_wipe = true;
                         continue; // Loop back, wipe, and reload in sorted order

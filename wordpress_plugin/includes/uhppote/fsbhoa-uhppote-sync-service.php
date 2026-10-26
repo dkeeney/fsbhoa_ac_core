@@ -132,8 +132,24 @@ function fsbhoa_execute_sync_logic($controllers, $permission_data, $cardholders_
 
         if (!$is_dry_run) { shell_exec(sprintf('uhppote-cli set-time %s 2>&1', $device_id)); }
 
+        // --- STEP 2b: HEALTH CHECK BEFORE A WIPE ---
+        // A wipe leaves the controller empty until the load finishes, so only a controller that
+        // answers reliably is wiped. On 2026-10-26 Lodge B lost about 1 in 5 replies from 00:01
+        // until it was power cycled; the nightly wiped it, could not load it, and every badge was
+        // refused there until 08:16. A controller that fails the check still gets the new time
+        // profiles and a load of the cards that changed, so a new (holiday) schedule takes effect,
+        // and it keeps its old cards if that load fails.
+        $allow_wipe = $wipe_memory;
+        if ($wipe_memory && !$is_dry_run) {
+            $lost = fsbhoa_count_lost_status_replies($device_id);
+            if ($lost > 0) {
+                error_log("SYNC HEALTH WARNING: $friendly_name ($device_id) lost $lost of " . FSBHOA_HEALTH_CHECK_READS . " status replies. Not wiping it: loading only the changed cards, with no recovery wipe. Check the controller (a power cycle cleared this on 2026-10-26).");
+                $allow_wipe = false;
+            }
+        }
+
         // --- STEP 3: WIPE MEMORY (Only on Nightly or Manual Full Sync) ---
-        if ($wipe_memory) {
+        if ($allow_wipe) {
             error_log("SYNC SERVICE: Wiping card & profile memory on $friendly_name...");
             if (!$is_dry_run) {
                 shell_exec(sprintf('uhppote-cli clear-time-profiles %s 2>&1', $device_id));
@@ -227,7 +243,8 @@ function fsbhoa_execute_sync_logic($controllers, $permission_data, $cardholders_
             $controller->controller_record_id,
             $cardholders_to_sync,
             $global_card_perms,
-            $is_dry_run
+            $is_dry_run,
+            $allow_wipe || !$wipe_memory // a delta sync may still re-sort; only an unhealthy controller is never wiped
         );
 
         if (!$bulk_success) {
@@ -264,6 +281,26 @@ function fsbhoa_execute_sync_logic($controllers, $permission_data, $cardholders_
 }
 
 
+
+// Status reads in the health check before a wipe. Normally a controller loses about 1 reply in
+// 40,000 (3 in a week of polling); Lodge B lost 1 in 5 on 2026-10-26, which 30 reads catch.
+define('FSBHOA_HEALTH_CHECK_READS', 30);
+
+/**
+ * Asks a controller for its status FSBHOA_HEALTH_CHECK_READS times and returns how many
+ * requests got no reply (or an error).
+ */
+function fsbhoa_count_lost_status_replies($device_id) {
+    $lost = 0;
+    for ($i = 0; $i < FSBHOA_HEALTH_CHECK_READS; $i++) {
+        $output = (string)shell_exec(sprintf('uhppote-cli --timeout 1s get-status %s 2>&1', escapeshellarg($device_id)));
+        if (trim($output) === '' || strpos($output, 'ERROR') !== false) {
+            $lost++;
+        }
+        usleep(100000); // 100ms hardware safety buffer
+    }
+    return $lost;
+}
 
 /**
  * Helper to handle Task Syncing (Clear and Add).
