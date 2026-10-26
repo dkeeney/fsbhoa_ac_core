@@ -139,7 +139,7 @@ function fsbhoa_execute_sync_logic($controllers, $permission_data, $cardholders_
         // refused there until 08:16. A controller that fails the check still gets the new time
         // profiles and a load of the cards that changed, so a new (holiday) schedule takes effect,
         // and it keeps its old cards if that load fails.
-        $allow_wipe = $wipe_memory;
+        $allow_wipe = true;
         if ($wipe_memory && !$is_dry_run) {
             $lost = fsbhoa_count_lost_status_replies($device_id);
             if ($lost > 0) {
@@ -149,7 +149,7 @@ function fsbhoa_execute_sync_logic($controllers, $permission_data, $cardholders_
         }
 
         // --- STEP 3: WIPE MEMORY (Only on Nightly or Manual Full Sync) ---
-        if ($allow_wipe) {
+        if ($wipe_memory && $allow_wipe) {
             error_log("SYNC SERVICE: Wiping card & profile memory on $friendly_name...");
             if (!$is_dry_run) {
                 shell_exec(sprintf('uhppote-cli clear-time-profiles %s 2>&1', $device_id));
@@ -244,7 +244,7 @@ function fsbhoa_execute_sync_logic($controllers, $permission_data, $cardholders_
             $cardholders_to_sync,
             $global_card_perms,
             $is_dry_run,
-            $allow_wipe || !$wipe_memory // a delta sync may still re-sort; only an unhealthy controller is never wiped
+            $allow_wipe // false if it failed the health check above; otherwise the loader checks before any wipe
         );
 
         if (!$bulk_success) {

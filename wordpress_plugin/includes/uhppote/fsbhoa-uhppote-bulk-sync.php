@@ -24,10 +24,10 @@ class Fsbhoa_Uhppote_Bulk_Sync {
 
     /**
      * Executes the bulk load-acl process for a single controller.
-     * @param bool $allow_wipe false for a controller that failed the sync's health check: a failed
-     *                         attempt is retried without the recovery wipe, and a load that leaves
-     *                         the table out of order isn't re-sorted, so the controller is never
-     *                         left empty by a wipe it can't be reloaded after.
+     * @param bool $allow_wipe false once the controller has failed the health check (the sync checks
+     *                         before its own wipe). Otherwise the check runs before the first wipe here.
+     *                         A controller that fails it is never wiped: a failed attempt is retried
+     *                         without the recovery wipe, and a table left out of order isn't re-sorted.
      */
     public function execute_bulk_load($device_id, $controller_record_id, $cardholders_to_sync, $global_card_perms, $is_dry_run, $allow_wipe = true) {
         global $wpdb;
@@ -170,6 +170,19 @@ class Fsbhoa_Uhppote_Bulk_Sync {
             // as delete-all + full load-acl so the table is rebuilt in sorted order.
             $needs_wipe = false;
             $wiped_this_run = false;
+            // A wipe leaves the controller empty until a load succeeds, so only a controller that
+            // answers reliably is wiped (checked once, before the first wipe this load would make).
+            $healthy = $allow_wipe ? null : false;
+            $may_wipe = function () use (&$healthy, $device_id) {
+                if ($healthy === null) {
+                    $lost = fsbhoa_count_lost_status_replies($device_id);
+                    $healthy = ($lost === 0);
+                    if (!$healthy) {
+                        error_log("SYNC HEALTH WARNING: {$device_id} lost {$lost} of " . FSBHOA_HEALTH_CHECK_READS . " status replies. Not wiping it: it keeps its cards, and only the cards that differ are written. Check the controller (a power cycle cleared this on 2026-10-26).");
+                    }
+                }
+                return $healthy;
+            };
             for ($attempt = 1; $attempt <= 3; $attempt++) {
                 if ($needs_wipe) {
                     $this->wipe_controller_cards($device_id);
@@ -202,7 +215,7 @@ class Fsbhoa_Uhppote_Bulk_Sync {
                     $clean_output = trim(preg_replace('/\s+/', ' ', (string)$output));
                     error_log("SYNC WARNING: Bulk ACL attempt {$attempt}/3 for {$device_id} had issues: {$clean_output}");
 
-                    if ($attempt < 3 && !$allow_wipe) {
+                    if ($attempt < 3 && !$may_wipe()) {
                         // The loader writes only what differs, so a retry picks up where this one stopped.
                         error_log("SYNC RECOVERY: load-acl failed on {$device_id}, which failed the health check. Retrying without a wipe (attempt " . ($attempt + 1) . ")...");
                         sleep(self::WIPE_SETTLE);
@@ -233,8 +246,8 @@ class Fsbhoa_Uhppote_Bulk_Sync {
                     $deleted   = (int)$counts[4];
                     $had_cards = $unchanged > 0 || $updated > 0 || $deleted > 0;
 
-                    if ($had_cards && ($added > 0 || $updated > 0 || $deleted > 0) && !$allow_wipe) {
-                        error_log("SYNC RESORT SKIPPED: {$device_id} failed the health check, so its card table is left as loaded (added {$added} / updated {$updated} / deleted {$deleted}). The next healthy nightly rebuilds it in order.");
+                    if ($had_cards && ($added > 0 || $updated > 0 || $deleted > 0) && !$may_wipe()) {
+                        error_log("SYNC RESORT SKIPPED: {$device_id} failed the health check, so its card table is left as loaded (added {$added} / updated {$updated} / deleted {$deleted}). The next sync that changes cards on a healthy controller rebuilds it in order.");
                     } elseif ($had_cards && ($added > 0 || $updated > 0 || $deleted > 0)) {
                         error_log("SYNC RESORT: load-acl for {$device_id} added {$added} / updated {$updated} / deleted {$deleted} cards in a populated table ({$clean_output}). Wiping and reloading to keep the card table sorted...");
                         $needs_wipe = true;
