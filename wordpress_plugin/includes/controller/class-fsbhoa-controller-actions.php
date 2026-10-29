@@ -462,7 +462,7 @@ class Fsbhoa_Controller_Actions {
         set_transient('fsbhoa_sync_status', ['status' => 'in_progress', 'message' => 'Full rebuild scheduled...'], MINUTE_IN_SECONDS * 10);
         fsbhoa_log_pending_change('generic');
         // Schedule the event to run in the background.
-        wp_schedule_single_event(time(), 'fsbhoa_run_nightly_rebuild');
+        wp_schedule_single_event(time(), 'fsbhoa_run_full_rebuild');
 
         wp_send_json_success('Full rebuild process has been scheduled.');
     }

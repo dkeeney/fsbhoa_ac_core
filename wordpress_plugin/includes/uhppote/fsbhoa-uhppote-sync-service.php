@@ -8,6 +8,7 @@ require_once FSBHOA_AC_PLUGIN_DIR . 'includes/uhppote/fsbhoa-uhppote-bulk-sync.p
 
 add_action('fsbhoa_run_background_sync', 'fsbhoa_perform_delta_sync');
 add_action('fsbhoa_run_nightly_rebuild', 'fsbhoa_perform_nightly_rebuild_sync');
+add_action('fsbhoa_run_full_rebuild', 'fsbhoa_perform_full_wipe_rebuild');
 add_action('fsbhoa_run_daily_time_sync', 'fsbhoa_perform_daily_time_sync');
 
 /**
@@ -50,8 +51,12 @@ function fsbhoa_perform_delta_sync() {
 
 /**
  * fsbhoa_perform_nightly_rebuild_sync()
+ * The nightly cron sync. It doesn't wipe by default (since 2026-10-29): the loader writes only
+ * the cards that differ, and wipes and reloads only if a load fails (a bad record on the
+ * controller can stop it reading its cards) or leaves the table out of order. The compiler
+ * still wipes when the active schedule changes.
  */
-function fsbhoa_perform_nightly_rebuild_sync( $wipe_memory = true ) {
+function fsbhoa_perform_nightly_rebuild_sync( $wipe_memory = false ) {
     error_log('[' . current_time('Y-m-d H:i:s T') . "] NIGHTLY REBUILD: Process started. Wipe Mode: " . ($wipe_memory ? 'ON' : 'OFF'));
     
     set_time_limit(300);
@@ -73,6 +78,15 @@ function fsbhoa_perform_nightly_rebuild_sync( $wipe_memory = true ) {
         $is_dry_run, 
         $wipe_memory, 
         $active_schedule_id);
+}
+
+
+/**
+ * fsbhoa_perform_full_wipe_rebuild()
+ * The "Force Full Rebuild" button: wipes each controller (after its health check) and reloads it.
+ */
+function fsbhoa_perform_full_wipe_rebuild() {
+    fsbhoa_perform_nightly_rebuild_sync(true);
 }
 
 
