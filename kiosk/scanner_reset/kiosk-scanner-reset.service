@@ -1,0 +1,6 @@
+[Unit]
+Description=Reset lobby kiosk card scanner if idle (possibly hung)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kiosk-scanner-reset.sh

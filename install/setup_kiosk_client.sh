@@ -49,6 +49,28 @@ else
     echo "WARNING: $WRAPPER_SCRIPT not found! Autostart will fail until this file exists."
 fi
 
+# 2b. Keep Ubuntu pop-ups off the kiosk screen (added 2026-11-01)
+# The "new release available" window opened over the kiosk browser and took keyboard
+# focus, so card swipes (the scanner types like a keyboard) went into it instead.
+echo "[2b/3] Disabling release-upgrade and update-notifier pop-ups..."
+if [ -f /etc/update-manager/release-upgrades ]; then
+    sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades
+fi
+cat << EOF > "$AUTOSTART_DIR/update-notifier.desktop"
+[Desktop Entry]
+Type=Application
+Name=Update Notifier
+Hidden=true
+X-GNOME-Autostart-enabled=false
+EOF
+chown "$REAL_USER":"$REAL_USER" "$AUTOSTART_DIR/update-notifier.desktop"
+# The release window itself comes from these systemd user units. Masking works without a running session.
+USER_UNIT_DIR="$USER_HOME/.config/systemd/user"
+mkdir -p "$USER_UNIT_DIR"
+ln -sf /dev/null "$USER_UNIT_DIR/update-notifier-release.path"
+ln -sf /dev/null "$USER_UNIT_DIR/update-notifier-release.service"
+chown -R "$REAL_USER":"$REAL_USER" "$USER_HOME/.config/systemd"
+
 # 3. Configure Auto-Login
 echo "[3/3] Configuring Auto-Login..."
 

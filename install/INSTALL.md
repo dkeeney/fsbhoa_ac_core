@@ -318,6 +318,32 @@ Find the "Restart Kiosk Display" icon.
 
 Drag the icon from the application list and drop it onto the desktop.
 
+### 3.4 Keep Ubuntu Pop-ups Off the Kiosk Screen
+`install/setup_kiosk_client.sh` does this. On a kiosk set up before 2026-11-01, run it again or do these steps by hand.
+
+Ubuntu's "new release available" window can open on top of the kiosk browser. The card scanner types like a keyboard, so while that window has focus, swipes go into it and the kiosk seems dead. To stop it:
+
+- Set `Prompt=never` in `/etc/update-manager/release-upgrades`.
+- Disable update-notifier autostart for the kiosk user: create `~/.config/autostart/update-notifier.desktop` containing `Hidden=true`.
+- As the kiosk user, run `systemctl --user mask update-notifier-release.path update-notifier-release.service`. These systemd user units, not the autostart entry, are what open the release window.
+
+Security updates are not affected.
+
+### 3.5 Card Scanner Auto-Reset (Optional)
+The USB card scanner (HID 413d:2107) sometimes stops sending card reads while still looking connected. Unplugging and replugging it fixes it. `kiosk/scanner_reset/` does the same thing from software.
+
+Every 10 minutes between 7:00 and 21:00, if no swipe has reached the kiosk service for 30 minutes, it turns the scanner's USB port off for 3 seconds and back on. A working scanner is unaffected; it disappears for about 5 seconds. A hung scanner can't be told apart from an unused one, so this runs regardless.
+
+Bash
+
+sudo ~/fsbhoa_ac/kiosk/scanner_reset/install.sh            # install files, test with --check
+sudo ~/fsbhoa_ac/kiosk/scanner_reset/install.sh --enable   # turn on the 10-minute timer
+
+- Dry run: `sudo kiosk-scanner-reset.sh --check`. Reset now: `sudo kiosk-scanner-reset.sh --force`.
+- Log: `journalctl -t kiosk-scanner-reset`
+- Thresholds (`IDLE_MIN`, `OPEN_HOUR`, `CLOSE_HOUR`) are at the top of the script.
+- Remove: `sudo systemctl disable --now kiosk-scanner-reset.timer`
+
 
 ## Enabling Automatic Login
 Open the Configuration File

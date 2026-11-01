@@ -18,6 +18,7 @@
 - `monitor_service/`, `kiosk/`, `zebra_print_service/` — Go services (`fsbhoa_monitor`, `fsbhoa_kiosk`, `fsbhoa_printer`).
 - Services run under systemd (`fsbhoa_events`, `fsbhoa_monitor`, `fsbhoa_kiosk`, `fsbhoa_printer`; `fsbhoa-lighting` is a separate project). Binaries live in `/usr/local/bin`; generated JSON configs in `/var/lib/fsbhoa/`.
 - Build: `./rebuild.sh` (build only) / `./rebuild.sh install` (installs + restarts services — production-impacting).
+- **Lobby kiosk display**: autostart runs `start_kiosk.sh`, a loop that keeps Firefox (`--kiosk`) on the kiosk page. `~/restart_kiosk_browser.sh` restarts the browser. The USB card scanner (HID 413d:2107) types like a keyboard into the page, which sends `manualSwipe` over the WebSocket. If `journalctl -u fsbhoa_kiosk` shows no `manualSwipe`, the swipe never reached the page. Two causes seen on 2026-11-01: an Ubuntu pop-up holding keyboard focus (now disabled by `install/setup_kiosk_client.sh`, see INSTALL.md 3.4), and a hung scanner (fixed by replugging; `kiosk/scanner_reset/` does that automatically, see INSTALL.md 3.5).
 
 ## Card sync (uhppote)
 
