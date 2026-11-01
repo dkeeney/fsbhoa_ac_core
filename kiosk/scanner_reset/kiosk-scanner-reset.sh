@@ -47,11 +47,12 @@ fi
 if [ $CHECK -eq 1 ]; then echo "would reset scanner at $NAME (port: ${PORT:-none})"; exit 0; fi
 
 date +%s > $STATE
+if [ $FORCE -eq 1 ]; then WHY="manual reset (--force)"; else WHY="no swipe for ${IDLE_MIN}+ min"; fi
 if [ -n "$PORT" ] && [ -w "$PORT/disable" ]; then
-  log "no swipe for ${IDLE_MIN}+ min: power-cycling scanner port $(basename $PORT)"
+  log "$WHY: power-cycling scanner port $(basename $PORT)"
   echo 1 > "$PORT/disable"; sleep 3; echo 0 > "$PORT/disable"
 else
-  log "no swipe for ${IDLE_MIN}+ min: port power control not available, re-authorizing $NAME"
+  log "$WHY: port power control not available, re-authorizing $NAME"
   echo 0 > "$DEV/authorized"; sleep 3; echo 1 > "$DEV/authorized"
 fi
 
