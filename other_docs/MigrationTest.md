@@ -28,7 +28,7 @@ On the testbed:
    wp db export ~/testbed_before_migration_test_$(date +%Y%m%d).sql
    ls -lh ~/testbed_before_migration_test_*.sql
    ```
-   Keep it in `/home/pi`, not on the NAS: it holds every resident's data and photos.
+   It holds every resident's data and photos. The testbed's full backup is about 7 GB, more than the Pi's free space, so the 2026-11-10 one went to the NAS (`IT_Docs/Current Projects/DoorKingIntegration/testbed_db.sql`, a phpMyAdmin export). The NAS is copied offsite and to a thumbdrive, so delete it once the test has succeeded.
 2. **Save the testbed's DoorKing credentials**, the result of the earlier imports, to compare with this test's and to re-enter the workbench test tags afterwards:
    ```
    wp db query "SELECT c.id, c.first_name, c.last_name, c.cardholder_status, cr.credential_type, cr.credential_value, cr.status
@@ -107,7 +107,17 @@ Take them one right after the other, when nobody is editing cardholders in the a
    ```
    time wp db query < /home/pi/fsbhoa_ac_core/migration.sql
    ```
-   **If it stops with an error, don't run it again.** It isn't repeatable (step 2 renames columns). Note the error, restore the backup from section 1 (`wp db import ~/testbed_before_migration_test_<date>.sql`), fix `migration.sql`, and start again from section 3.
+   **If it stops with an error, don't run it again.** It isn't repeatable (step 2 renames columns). Note the error, restore the backup from section 1, fix `migration.sql`, and start again from section 3. To restore:
+   ```
+   cd /var/www/html
+   sudo systemctl stop fsbhoa_events fsbhoa_vehicle fsbhoa_monitor fsbhoa_kiosk fsbhoa_printer
+   # A phpMyAdmin export has no DROP TABLE lines, so empty the database first
+   wp db query "SET FOREIGN_KEY_CHECKS = 0; $(wp db tables --all-tables --format=csv | tr ',' '\n' | sed 's/.*/DROP TABLE `&`;/' | tr '\n' ' ') SET FOREIGN_KEY_CHECKS = 1;"
+   wp db import "<the backup file>"
+   wp db query "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"
+   sudo systemctl start fsbhoa_events fsbhoa_vehicle fsbhoa_monitor fsbhoa_kiosk fsbhoa_printer
+   ```
+   The table count should match the backup's (89 for the 2026-11-10 backup). The backup can be read straight from the NAS; the Pi has no room for a 7 GB copy.
 2. **Check the result against the production baseline** (section 2, step 2):
    - Cardholders: the same total. `inactive` and `disabled` became `active`; archived vendors became `purged`.
      ```
