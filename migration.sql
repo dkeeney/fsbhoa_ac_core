@@ -167,39 +167,87 @@ SET c.household_id = @first_lodge_hh + (t.row_id - 1);
 
 DROP TEMPORARY TABLE IF EXISTS tmp_lodge_sync;
 
--- 3b. Standard Residents (Property != 480): Group by property_id & pick primary
+-- 3b. Standard Residents (Property != 480). The current residents of a property share one
+-- household, whatever their last names. In V2 an archived person keeps their household (a
+-- deceased spouse is not a new household; a household ends only when its last member is archived
+-- and a new resident moves in). V1 had no households, so for people archived in V1 it's a guess
+-- (2026-11-15, the user): one with the same family name as a current resident of the property
+-- joins the current household (deceased spouses, duplicate records); any other archived or purged
+-- family gets its own household per property, so a previous owner's codes and vehicles never land
+-- on the current household. V1's dates can't tell them apart: the office usually added the new
+-- owners before archiving the old ones. The family name is the last name up to the first comma or
+-- space ("Whitfield, Trustees" -> whitfield). The primary is the lowest current id, else the lowest
+-- id. Temporary tables are each used once per statement (MySQL can't reopen one).
+DROP TEMPORARY TABLE IF EXISTS tmp_hh_member;
+CREATE TEMPORARY TABLE tmp_hh_member (
+  `cardholder_id` INT NOT NULL PRIMARY KEY,
+  `property_id` INT NOT NULL,
+  `family` VARCHAR(100) NOT NULL,
+  `is_current` TINYINT NOT NULL,
+  `hh_key` VARCHAR(150) DEFAULT NULL
+);
+
+INSERT INTO tmp_hh_member (`cardholder_id`, `property_id`, `family`, `is_current`)
+SELECT
+  id,
+  property_id,
+  LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(TRIM(COALESCE(last_name, '')), ',', 1), ' ', 1)),
+  IF(cardholder_status IN ('archived', 'purged'), 0, 1)
+FROM `ac_cardholders`
+WHERE `property_id` IS NOT NULL
+  AND `property_id` != 480;
+
+UPDATE tmp_hh_member
+SET hh_key = IF(is_current = 1, CONCAT(property_id, '|'), CONCAT(property_id, '|', family));
+
+-- Archived or purged people sharing a current resident's family name join the current household
+DROP TEMPORARY TABLE IF EXISTS tmp_current_family;
+CREATE TEMPORARY TABLE tmp_current_family (
+  `property_id` INT NOT NULL,
+  `family` VARCHAR(100) NOT NULL,
+  PRIMARY KEY (`property_id`, `family`)
+);
+INSERT IGNORE INTO tmp_current_family (`property_id`, `family`)
+SELECT property_id, family FROM tmp_hh_member WHERE is_current = 1 AND family != '';
+
+UPDATE tmp_hh_member m
+JOIN tmp_current_family f ON f.property_id = m.property_id AND f.family = m.family
+SET m.hh_key = CONCAT(m.property_id, '|')
+WHERE m.is_current = 0;
+
+DROP TEMPORARY TABLE IF EXISTS tmp_current_family;
+
 DROP TEMPORARY TABLE IF EXISTS tmp_property_sync;
 CREATE TEMPORARY TABLE tmp_property_sync (
   `row_id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `property_id` INT NOT NULL,
-  `household_name` VARCHAR(100) NOT NULL,
+  `hh_key` VARCHAR(150) NOT NULL,
+  `household_name` VARCHAR(100) NOT NULL DEFAULT '',
   `primary_cardholder_id` INT DEFAULT NULL
 );
 
-INSERT INTO tmp_property_sync (`property_id`, `household_name`, `primary_cardholder_id`)
+INSERT INTO tmp_property_sync (`hh_key`, `primary_cardholder_id`)
 SELECT
-  property_id,
-  CONCAT(MAX(TRIM(last_name)), ' Household'),
-  COALESCE(
-    MIN(CASE WHEN cardholder_status NOT IN ('archived', 'purged') THEN id ELSE NULL END),
-    MIN(id)
-  ) AS primary_cardholder_id
-FROM `ac_cardholders`
-WHERE `property_id` IS NOT NULL
-  AND `property_id` != 480
-GROUP BY `property_id`
-ORDER BY property_id ASC;
+  hh_key,
+  COALESCE(MIN(CASE WHEN is_current = 1 THEN cardholder_id ELSE NULL END), MIN(cardholder_id))
+FROM tmp_hh_member
+GROUP BY hh_key
+ORDER BY MIN(property_id) ASC, hh_key ASC;
+
+UPDATE tmp_property_sync t
+JOIN `ac_cardholders` c ON c.id = t.primary_cardholder_id
+SET t.household_name = LEFT(CONCAT(COALESCE(NULLIF(TRIM(c.last_name), ''), 'Unknown'), ' Household'), 100);
 
 INSERT INTO `ac_households` (`household_name`, `primary_cardholder_id`)
 SELECT `household_name`, `primary_cardholder_id` FROM tmp_property_sync ORDER BY `row_id` ASC;
 
 SET @first_prop_hh = LAST_INSERT_ID();
 UPDATE `ac_cardholders` c
-JOIN tmp_property_sync t ON c.property_id = t.property_id
-SET c.household_id = @first_prop_hh + (t.row_id - 1)
-WHERE c.property_id != 480;
+JOIN tmp_hh_member m ON m.cardholder_id = c.id
+JOIN tmp_property_sync t ON t.hh_key = m.hh_key
+SET c.household_id = @first_prop_hh + (t.row_id - 1);
 
 DROP TEMPORARY TABLE IF EXISTS tmp_property_sync;
+DROP TEMPORARY TABLE IF EXISTS tmp_hh_member;
 
 -- ==============================================================================
 -- STEP 4: Data Migration (Migrate legacy RFIDs into ac_credentials)
