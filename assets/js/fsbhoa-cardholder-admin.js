@@ -100,7 +100,14 @@ jQuery(function($) {
         initDataTable: function() {
             if (!this.vars.cardholderTable.length) { return; }
 
-            this.dataTableInstance = this.vars.cardholderTable.DataTable({
+            // A list can set its own sort (data-fsbhoa-order) and a layout name
+            // (data-fsbhoa-layout): a sort saved under another layout isn't restored, since its
+            // column numbers would point at other columns.
+            const table = this.vars.cardholderTable;
+            const layout = String(table.data('fsbhoa-layout') || '');
+            const order = table.data('fsbhoa-order') || [[ 2, 'asc' ]];
+
+            this.dataTableInstance = table.DataTable({
                 "dom": 'tip',
                 "pageLength": 100,
                 "stateSave": true,
@@ -115,7 +122,11 @@ jQuery(function($) {
                     "style": 'multi+shift',
                     "selector": 'td:first-child'
                 },
-                "order": [[ 2, 'asc' ]]
+                "order": order,
+                "stateSaveParams": function (settings, data) { data.fsbhoaLayout = layout; },
+                "stateLoadParams": function (settings, data) {
+                    if ((data.fsbhoaLayout || '') !== layout) { return false; }
+                }
             });
 
             const state = this.dataTableInstance.state.loaded();

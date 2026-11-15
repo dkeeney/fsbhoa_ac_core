@@ -94,7 +94,7 @@ class Fsbhoa_Shortcodes {
             wp_enqueue_script('fsbhoa-photo-croppie', FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-photo-croppie.js', array('jquery', 'jquery-ui-dialog', 'croppie-script'), FSBHOA_AC_PLUGIN_VERSION, true);
 
             $app_script_handle = 'fsbhoa-cardholder-admin-script';
-            wp_enqueue_script($app_script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-cardholder-admin.js', array('jquery', 'jquery-ui-autocomplete', 'datatables-script', 'fsbhoa-photo-croppie', 'canvg-script'), FSBHOA_AC_PLUGIN_VERSION, true);
+            wp_enqueue_script($app_script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-cardholder-admin.js', array('jquery', 'jquery-ui-autocomplete', 'datatables-script', 'fsbhoa-photo-croppie', 'canvg-script'), FSBHOA_AC_PLUGIN_VERSION . '.' . filemtime(FSBHOA_AC_PLUGIN_DIR . 'assets/js/fsbhoa-cardholder-admin.js'), true); // file time: browsers fetch it again when it changes
 
             $ajax_settings = array(
                 'ajax_url' => admin_url('admin-ajax.php'),

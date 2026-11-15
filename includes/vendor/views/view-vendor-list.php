@@ -163,16 +163,17 @@ function fsbhoa_render_vendor_list_view() {
                 </div>
             </div>
 
-            <table id="fsbhoa-cardholder-table" class="display" style="width:100%">
+            <?php // Sorted by company (column 3), then contact (column 2), as the query; the layout name resets a list sort saved from the old column order ?>
+            <table id="fsbhoa-cardholder-table" class="display" style="width:100%" data-fsbhoa-order='[[3,"asc"],[2,"asc"]]' data-fsbhoa-layout="vendor-contact-first">
                 <thead>
                     <tr>
                         <th class="no-sort fsbhoa-checkbox-column">
                             <input type="checkbox" id="cb-select-all">
                         </th>
                         <th class="no-sort fsbhoa-actions-column"><?php esc_html_e( 'Actions', 'fsbhoa-ac' ); ?></th>
+                        <th><?php esc_html_e( 'Contact Name', 'fsbhoa-ac' ); ?></th>
                         <th><?php esc_html_e( 'Company / Organization', 'fsbhoa-ac' ); ?></th>
                         <th><?php esc_html_e( 'Category', 'fsbhoa-ac' ); ?></th>
-                        <th><?php esc_html_e( 'Contact Name', 'fsbhoa-ac' ); ?></th>
                         <th><?php esc_html_e( 'Phone', 'fsbhoa-ac' ); ?></th>
                         <th class="sorting fsbhoa-status-column"><?php esc_html_e( 'Status', 'fsbhoa-ac' ); ?></th>
                     </tr>
@@ -211,14 +212,16 @@ function fsbhoa_render_vendor_list_view() {
                                     <span class="dashicons dashicons-trash" style="color:#d63638;"></span>
                                 </a>
                             </td>
-                            <td>
+                            <?php // Shown first name first, sorted by last name ?>
+                            <td data-order="<?php echo esc_attr( trim( $last . ' ' . $first ) ); ?>"><?php echo esc_html( $contact_name ); ?></td>
+                            <?php // Sorted by the name alone, not the hidden keys (kept for the search) ?>
+                            <td data-order="<?php echo esc_attr( $company ); ?>">
                                 <strong><a href="<?php echo esc_url( $edit_url ); ?>"><?php echo esc_html( $company ); ?></a></strong>
                                 <?php if ( ! empty( $vendor['all_creds'] ) ) : ?>
                                     <span class="fsbhoa-visually-hidden">Keys: <?php echo esc_html( $vendor['all_creds'] ); ?></span>
                                 <?php endif; ?>
                             </td>
                             <td><span class="badge" style="background:#f0f0f1; padding:3px 8px; border-radius:3px; font-size:12px; font-weight:500; border:1px solid #ccd0d4;"><?php echo esc_html( $category ); ?></span></td>
-                            <td><?php echo esc_html( $contact_name ); ?></td>
                             <td><?php echo ! empty( $vendor['phone'] ) ? esc_html( $vendor['phone'] ) : '—'; ?></td>
                             <td class="fsbhoa-status-column"><?php echo esc_html( ucwords( $vendor['cardholder_status'] ) ); ?></td>
                         </tr>
