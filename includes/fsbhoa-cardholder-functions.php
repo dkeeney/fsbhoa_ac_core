@@ -561,9 +561,11 @@ function fsbhoa_standardize_address( $address ) {
 /**
  * Sends a push notification to a Discord channel via Webhook.
  *
- * @param string $message The alert text to send.
+ * @param string $message  The alert text to send.
+ * @param bool   $critical True (the default) pings @everyone as a critical alert; false sends a
+ *                         plain notice, for something to look into rather than act on now.
  */
-function fsbhoa_send_discord_alert( $message ) {
+function fsbhoa_send_discord_alert( $message, $critical = true ) {
     // Paste your copied Discord Webhook URL here
     $webhook_url = get_option('fsbhoa_ac_discord_webhook_url', '');
     $username    = get_option('fsbhoa_ac_discord_username', 'Access Control Monitor');
@@ -573,7 +575,7 @@ function fsbhoa_send_discord_alert( $message ) {
     }
 
     $payload = json_encode([
-        'content'  => "@everyone 🚨 **CRITICAL ALERT** 🚨\n" . $message,
+        'content'  => ( $critical ? "@everyone 🚨 **CRITICAL ALERT** 🚨\n" : "**Notice**\n" ) . $message,
         'username' => $username
     ]);
 

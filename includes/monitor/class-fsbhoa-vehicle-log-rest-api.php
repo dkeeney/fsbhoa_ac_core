@@ -326,10 +326,18 @@ class Fsbhoa_Vehicle_Log_REST_API {
             error_log( 'FSBHOA Vehicle Log: insert failed: ' . $wpdb->last_error );
             return new WP_Error( 'db_insert_error', 'Could not store the vehicle event', array( 'status' => 500 ) );
         }
+        $vehicle_log_id = (int) $wpdb->insert_id;
+
+        // For other plugins (DoorKing: a legacy value used at a gate), without the photos
+        $hook_data = $data;
+        foreach ( array( 'context_image_data', 'lpr_image_data', 'overview_image_data', 'note_image_data' ) as $blob_key ) {
+            unset( $hook_data[ $blob_key ] );
+        }
+        do_action( 'fsbhoa_core_vehicle_event_logged', $vehicle_log_id, $hook_data );
 
         return rest_ensure_response( array(
             'success'        => true,
-            'vehicle_log_id' => $wpdb->insert_id,
+            'vehicle_log_id' => $vehicle_log_id,
         ) );
     }
 
