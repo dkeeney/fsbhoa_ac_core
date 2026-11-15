@@ -1,0 +1,15 @@
+[Unit]
+Description=FSBHOA Monitor Service
+After=network.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=www-data
+WorkingDirectory=/var/lib/fsbhoa
+ExecStart=/usr/local/bin/fsbhoa_monitor -config /var/lib/fsbhoa/monitor_service.json
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -30,11 +30,18 @@ WebSocket hub (gorilla/websocket) for the live monitor. Endpoints: `/notify` (ev
 ## Commands
 
 ```bash
-./rebuild.sh            # build Go service(s) -> monitor_service/fsbhoa_monitor
-./rebuild.sh install    # build, copy to /usr/local/bin, restart systemd fsbhoa_monitor
+./build.sh              # build Go service(s) -> monitor_service/fsbhoa_monitor
+./build.sh install      # also install it, and its unit (systemd/), restart if changed
+./deploy-production.sh  # deploy all the plugins (~/deploy-production.sh links here)
 cd monitor_service && go build ./... && go vet ./...
 php -l path/to/file.php # syntax check (no PHPUnit/linters configured)
 sudo systemctl status fsbhoa_* --no-pager
 ```
 
-`TEST_PLAN.md` is a manual test plan, and there is an in-app Test Suite page (`includes/admin/class-fsbhoa-test-suite-*`). `rebuild.sh` is for rebuilding this plugin's services on the dev machine. `deploy_monitor.sh` (and `/home/pi/deploy-production.sh`) were early attempts at production deployment and are out of date; the deployment process is due to be redesigned, so don't rely on them.
+`TEST_PLAN.md` is a manual test plan, and there is an in-app Test Suite page (`includes/admin/class-fsbhoa-test-suite-*`). 
+
+## Deployment (since 2026-11-15)
+
+- **Each service plugin** (core, kiosk, uhppote, vehicle, zebra) has the same `build.sh`, which runs from any folder: `build.sh` builds; `build.sh install` also installs the binaries in `/usr/local/bin` (keeping the one replaced as `.bak`) and the plugin's units from `systemd/` (`@USER@` becomes the user who runs it, `@PLUGIN_DIR@` the plugin folder; group `www-data`), and restarts only what changed. A service whose config (`/var/lib/fsbhoa/*.json`) is missing isn't started: the settings pages write the configs.
+- **`deploy-production.sh`** (here; `~/deploy-production.sh` links to it), run as the service user: clones or pulls (`--ff-only`; `--no-pull` deploys what's checked out) the seven repos into that user's home, links each into WordPress (links, so quick fixes work in place), runs each `build.sh install`, and lists inactive plugins (it never activates one) and the services. While the V1 plugin `fsbhoa-access-control` is active it only builds. It's also the routine update. Needs wp-cli (on production since 2026-11-15: `/usr/local/bin/wp`, 2.12.0).
+- The database changes and the switch from V1 are the cutover, not this script.
