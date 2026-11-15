@@ -105,7 +105,15 @@ function fsbhoa_render_vendor_form_view( $vendor_id = 0 ) {
                                 'Gates'              => 'Gates',
                                 'General Contractor' => 'General Contractor',
                             );
-                            $selected_category = ! empty( $form_data['resident_type'] ) ? $form_data['resident_type'] : 'General Contractor';
+                            // No category, or V1's "Contractor", opens as General Contractor. Any other
+                            // category not in the list is kept (shown as it is), so saving doesn't change it
+                            // to the first one in the list.
+                            $selected_category = trim( (string) ( $form_data['resident_type'] ?? '' ) );
+                            if ( '' === $selected_category || 'Contractor' === $selected_category ) {
+                                $selected_category = 'General Contractor';
+                            } elseif ( ! isset( $vendor_categories[ $selected_category ] ) ) {
+                                $vendor_categories[ $selected_category ] = $selected_category;
+                            }
                             foreach ( $vendor_categories as $cat_val => $cat_label ) :
                                 ?>
                                 <option value="<?php echo esc_attr( $cat_val ); ?>" <?php selected( $selected_category, $cat_val ); ?>>

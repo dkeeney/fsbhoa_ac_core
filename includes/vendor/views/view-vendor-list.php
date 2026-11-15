@@ -185,11 +185,11 @@ function fsbhoa_render_vendor_list_view() {
                             $purge_nonce   = wp_create_nonce( 'fsbhoa_purge_vendor_nonce_' . $vendor['id'] );
                             $purge_url     = add_query_arg( array( 'action' => 'fsbhoa_purge_vendor', 'vendor_id' => absint( $vendor['id'] ), '_wpnonce' => $purge_nonce ), admin_url( 'admin-post.php' ) );
 
-                            $print_report_url = add_query_arg( array(
-                                'action'       => 'fsbhoa_print_report',
-                                'selected_ids' => absint( $vendor['id'] ),
-                                '_wpnonce'     => wp_create_nonce( 'fsbhoa_print_report_nonce' ),
-                            ), admin_url( 'admin-post.php' ) );
+                            // The card preview and Zebra print page, as on the cardholder list
+                            $print_card_url = add_query_arg( array(
+                                'action'        => 'print_card',
+                                'cardholder_id' => absint( $vendor['id'] ),
+                            ), get_permalink( get_page_by_path( 'print-photo-id' ) ) );
 
                             $first        = trim( $vendor['first_name'] ?? '' );
                             $last         = trim( $vendor['last_name'] ?? '' );
@@ -205,7 +205,7 @@ function fsbhoa_render_vendor_list_view() {
                                 <a href="<?php echo esc_url( $edit_url ); ?>" class="fsbhoa-action-icon" title="<?php esc_attr_e( 'Edit Vendor', 'fsbhoa-ac' ); ?>">
                                     <span class="dashicons dashicons-edit"></span>
                                 </a>
-                                <a href="<?php echo esc_url( $print_report_url ); ?>" target="_blank" class="fsbhoa-action-icon" title="<?php esc_attr_e( 'Print Vendor Details', 'fsbhoa-ac' ); ?>">
+                                <a href="<?php echo esc_url( $print_card_url ); ?>" class="fsbhoa-action-icon" title="<?php esc_attr_e( 'Print ID Card', 'fsbhoa-ac' ); ?>">
                                     <span class="dashicons dashicons-printer"></span>
                                 </a>
                                 <a href="<?php echo esc_url( $purge_url ); ?>" class="fsbhoa-action-icon" title="<?php esc_attr_e( 'Purge Vendor', 'fsbhoa-ac' ); ?>" onclick="return confirm('Are you sure you want to purge this vendor and all associated vehicles and keycards? This cannot be undone.');">
@@ -216,7 +216,7 @@ function fsbhoa_render_vendor_list_view() {
                             <td data-order="<?php echo esc_attr( trim( $last . ' ' . $first ) ); ?>"><?php echo esc_html( $contact_name ); ?></td>
                             <?php // Sorted by the name alone, not the hidden keys (kept for the search) ?>
                             <td data-order="<?php echo esc_attr( $company ); ?>">
-                                <strong><a href="<?php echo esc_url( $edit_url ); ?>"><?php echo esc_html( $company ); ?></a></strong>
+                                <strong><?php echo esc_html( $company ); ?></strong>
                                 <?php if ( ! empty( $vendor['all_creds'] ) ) : ?>
                                     <span class="fsbhoa-visually-hidden">Keys: <?php echo esc_html( $vendor['all_creds'] ); ?></span>
                                 <?php endif; ?>
