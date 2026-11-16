@@ -148,8 +148,9 @@ class Fsbhoa_Shortcodes {
 
             // Its own specific styles and scripts
             $script_handle = 'fsbhoa-reports-admin';
-            wp_enqueue_style('fsbhoa-reports-styles', FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-reports-styles.css', array('fsbhoa-shared-styles'), FSBHOA_AC_PLUGIN_VERSION);
-            wp_enqueue_script($script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-reports-admin.js', array('jquery', 'datatables-script', 'jquery-ui-datepicker', 'datatables-select'), FSBHOA_AC_PLUGIN_VERSION, true);
+            // Versions follow the files' times, so browsers fetch changed ones
+            wp_enqueue_style('fsbhoa-reports-styles', FSBHOA_AC_PLUGIN_URL . 'assets/css/fsbhoa-reports-styles.css', array('fsbhoa-shared-styles'), FSBHOA_AC_PLUGIN_VERSION . '.' . filemtime(FSBHOA_AC_PLUGIN_DIR . 'assets/css/fsbhoa-reports-styles.css'));
+            wp_enqueue_script($script_handle, FSBHOA_AC_PLUGIN_URL . 'assets/js/fsbhoa-reports-admin.js', array('jquery', 'datatables-script', 'jquery-ui-datepicker', 'datatables-select'), FSBHOA_AC_PLUGIN_VERSION . '.' . filemtime(FSBHOA_AC_PLUGIN_DIR . 'assets/js/fsbhoa-reports-admin.js'), true);
 
             // Localize data for the reports script
             wp_localize_script($script_handle, 'fsbhoa_reports_vars', array(

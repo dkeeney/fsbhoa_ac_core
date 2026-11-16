@@ -16,7 +16,7 @@ jQuery(document).ready(function($) {
         },
         "columns": [
             { "data": null, "defaultContent": "", "className": "select-checkbox", "orderable": false },
-            { "data": "event_timestamp" },
+            { "data": "event_timestamp", "className": "datetime-column" },
             {
               "data": "photo",
               "orderable": false,
@@ -42,10 +42,10 @@ jQuery(document).ready(function($) {
               }
             },
             { "data": "resident_type", "className": "type-column" },
-            { "data": "property" },
+            { "data": "property", "className": "property-column" },
             { "data": "gate_name" },
             { "data": "access_granted", "orderable": false },
-            { "data": "event_description", "orderable": false }
+            { "data": "event_description", "className": "description-column", "orderable": false }
         ],
         "columnDefs": [ { "targets": 2, "visible": false } ],
         "order": [[ 1, "desc" ]],

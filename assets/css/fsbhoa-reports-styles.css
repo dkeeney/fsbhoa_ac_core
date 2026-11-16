@@ -77,6 +77,16 @@ th.type-column, td.type-column {
     text-align: center !important;
 }
 
+/* Access log: the date and time and the property on one line (more rows to a page); the
+   description wraps instead */
+th.datetime-column, td.datetime-column,
+td.property-column {
+    white-space: nowrap;
+}
+td.description-column {
+    width: 18%;
+}
+
 /* Status markers in the table */
 .access-granted {
     color: #228B22; /* ForestGreen */

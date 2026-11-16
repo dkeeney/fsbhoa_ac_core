@@ -62,7 +62,7 @@ class Fsbhoa_Reports_Admin_Page {
                         <thead>
                             <tr>
                                 <th class="no-sort select-checkbox" style="width: 10px;"></th>
-                                <th><?php esc_html_e( 'Date & Time', 'fsbhoa-ac' ); ?></th>
+                                <th class="datetime-column"><?php esc_html_e( 'Date & Time', 'fsbhoa-ac' ); ?></th>
                                 <th class="no-sort photo-column"><?php esc_html_e( 'Photo', 'fsbhoa-ac' ); ?></th>
                                 <th><?php esc_html_e( 'Cardholder', 'fsbhoa-ac' ); ?></th>
                                 <th class="type-column"><?php esc_html_e( 'T', 'fsbhoa-ac' ); ?></th>
