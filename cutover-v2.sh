@@ -167,7 +167,9 @@ Left to do by hand (fsbhoa_ac_core other_docs/ARCHITECTURE.md, "To do before the
  2. Save the Event Service (with Enable Scheduled Sync on), Kiosk, Print Service and Vehicle
     settings pages, so their configs get the key.
  3. DoorKing: check the settings (account, To_RAM_Production). On the DoorKing Legacy page,
-    upload the same RAM export ($(basename "${CSV:-the RAM export}")), check, and keep what's lost.
+    upload the same RAM export ($(basename "${CSV:-the RAM export}")), check, and Keep with the default
+    ticks (not in the database + archived or purged): then every windshield tag and gate code RAM
+    has goes out.
  4. Vehicle lanes (ARCHITECTURE.md step 10): settings-import from the testbed's export (without
     the Workbench lane), the NVR password, ffmpeg and tools/install_front_plate.sh, the FTP
     server (lpr_ftp/setup.sh), the cameras' FTP target.
