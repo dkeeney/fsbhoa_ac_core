@@ -16,8 +16,8 @@
 # migration.sql's households replace the other, as in the rehearsal); delete the
 # retired DoorKing proxy's options; set FSBHOA_AC_ENVIRONMENT to production; link and activate
 # the V2 plugins; write the service configs from the settings; deploy-production.sh (installs
-# and starts the services); the DoorKing import (dry run, residents, vendors) and the OFFICE
-# directory listing; point the kiosk autostart at the kiosk plugin; end maintenance mode. Then
+# and starts the services); the OFFICE System entry (the Lodge office's directory listing); the
+# DoorKing import (dry run, residents, vendors); point the kiosk autostart at the kiosk plugin; end maintenance mode. Then
 # it prints the steps left to do by hand (also in the backup folder, CHECKLIST.txt).
 #
 # Run as the user the services run as (it uses sudo itself), from anywhere.
@@ -41,10 +41,11 @@ V2=(
 SERVICES=(fsbhoa_events fsbhoa_kiosk fsbhoa_monitor fsbhoa_printer fsbhoa_vehicle)
 # Tables migration.sql creates: none may exist before the cutover
 NEW_TABLES=(ac_households ac_vehicles ac_credential_types ac_credentials)
-# The Lodge office's directory code is on this vendor in V1 (RAM row OFFICE); it moves to an
-# OFFICE listing of its own
-OFFICE_FROM_ID=875
-OFFICE_FROM_NAME=Alshami
+# The Lodge office's directory listing: RAM row OFFICE, directory code 9925 (keypad 9925# calls
+# 661-873-0580; dkeen 2026-11-16). A special entry like the test cardholders: resident type
+# System, at the System property, in a household of its own. Created before the DoorKing import,
+# whose alias OFFICE gives it the row's directory code; the export sends it as any household.
+OFFICE_PHONE=6618730580
 KIOSK_AUTOSTART="$HOME/.config/autostart/start_kiosk.sh.desktop"
 
 MODE="${1:-}"; ARG="${2:-}"
@@ -113,12 +114,10 @@ check_server() {
     echo "   [OK] the V2 tables don't exist yet"
     [ -r "$CSV" ] || fail "can't read the RAM export $CSV"
     echo "   [OK] RAM export $CSV ($(wc -l < "$CSV") lines, $(date -r "$CSV" '+%Y-%m-%d %H:%M'))"
-    local office
-    office="$(sql "SELECT last_name FROM ac_cardholders WHERE id = $OFFICE_FROM_ID")"
-    if [ "$office" = "$OFFICE_FROM_NAME" ]; then
-        echo "   [OK] the office directory code is on cardholder #$OFFICE_FROM_ID ($office)"
+    if grep -q '^[^,]*,"\{0,1\}OFFICE"\{0,1\},' "$CSV"; then
+        echo "   [OK] RAM export has the OFFICE row: $(grep '^[^,]*,"\{0,1\}OFFICE"\{0,1\},' "$CSV" | head -1 | cut -d, -f2-6)"
     else
-        echo "   [WARN] cardholder #$OFFICE_FROM_ID is '${office}', not $OFFICE_FROM_NAME: the OFFICE step will be skipped"
+        echo "   [WARN] RAM export has no OFFICE row: the OFFICE vendor will have no directory code"
     fi
     local free need
     free="$(df -Pm "$HOME" | awk 'NR==2 {print $4}')"
@@ -246,6 +245,23 @@ do_run() {
     say "Install and start the services"
     "$CORE/deploy-production.sh" --no-pull
 
+    say "OFFICE System entry (the Lodge office's directory listing)"
+    if [ "$(sql "SELECT COUNT(*) FROM ac_cardholders WHERE last_name = 'OFFICE' AND resident_type = 'System'")" = 0 ]; then
+        wpq db query "START TRANSACTION;
+INSERT INTO ac_property (house_number, street_name, street_address, origin)
+ SELECT '0', 'System', 'System', 'system' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM ac_property WHERE street_address = 'System');
+SET @prop = (SELECT MIN(property_id) FROM ac_property WHERE street_address = 'System');
+INSERT INTO ac_households (household_name) VALUES ('OFFICE Household');
+SET @hh = LAST_INSERT_ID();
+INSERT INTO ac_cardholders (first_name, last_name, property_id, household_id, phone, phone_type, cardholder_status, cardholder_type, resident_type, origin, notes, created_at, updated_at)
+ VALUES ('', 'OFFICE', @prop, @hh, '$OFFICE_PHONE', 'Office', 'active', 'resident', 'System', 'manual', 'Lodge office directory listing (RAM row OFFICE): keypad 9925# calls the office. A System entry like the test cardholders; holds the directory code, no badge.', NOW(), NOW());
+UPDATE ac_households SET primary_cardholder_id = LAST_INSERT_ID() WHERE household_id = @hh;
+COMMIT;"
+        echo "   [OK] created"
+    else
+        echo "   [OK] already there"
+    fi
+
     say "DoorKing import from $CSV"
     local imp="$REPO_DIR/fsbhoa_ac_doorking/tools/cli_import.php" dry="$B/dk_import_dry_run.log"
     wpq eval-file "$imp" "$CSV" dry residents > "$dry" || true
@@ -255,20 +271,7 @@ do_run() {
         echo "   $target: $(grep -o 'imported=[0-9]*' "$B/dk_import_$target.log" || echo "see $B/dk_import_$target.log")"
     done
 
-    say "OFFICE directory listing"
-    if [ "$(sql "SELECT last_name FROM ac_cardholders WHERE id = $OFFICE_FROM_ID")" = "$OFFICE_FROM_NAME" ]; then
-        wpq db query "START TRANSACTION;
-INSERT INTO ac_cardholders (first_name, last_name, property_id, phone, cardholder_status, cardholder_type, resident_type, origin, notes, created_at, updated_at)
- VALUES ('', 'OFFICE', 480, '873-0580', 'active', 'resident', 'Other', 'manual', 'Lodge office directory listing (RAM row OFFICE: used for Lodge entry). Holds the office directory code; no badge.', NOW(), NOW());
-SET @cid = LAST_INSERT_ID();
-INSERT INTO ac_households (household_name, primary_cardholder_id) VALUES ('Lodge - OFFICE', @cid);
-UPDATE ac_cardholders SET household_id = LAST_INSERT_ID() WHERE id = @cid;
-UPDATE ac_credentials SET cardholder_id = @cid, updated_at = NOW() WHERE cardholder_id = $OFFICE_FROM_ID AND credential_type IN ('DK_DIR_CODE', 'DK_DIR_OPT_IN');
-COMMIT;"
-        echo "   [OK] OFFICE holds: $(sql "SELECT GROUP_CONCAT(credential_type, ' ', credential_value) FROM ac_credentials cr JOIN ac_cardholders c ON c.id = cr.cardholder_id WHERE c.last_name = 'OFFICE' AND c.property_id = 480")"
-    else
-        echo "   [SKIP] cardholder #$OFFICE_FROM_ID isn't $OFFICE_FROM_NAME"
-    fi
+    echo "   OFFICE holds: $(sql "SELECT IFNULL(GROUP_CONCAT(credential_type, ' ', credential_value), 'nothing: check it') FROM ac_credentials cr JOIN ac_cardholders c ON c.id = cr.cardholder_id WHERE c.last_name = 'OFFICE' AND c.resident_type = 'System'")"
 
     if [ "$REHEARSAL" = 0 ] && [ -f "$KIOSK_AUTOSTART" ] && grep -q "$HOME/fsbhoa_ac/start_kiosk.sh" "$KIOSK_AUTOSTART"; then
         sed -i "s|$HOME/fsbhoa_ac/start_kiosk.sh|$REPO_DIR/fsbhoa_ac_kiosk/start_kiosk.sh|" "$KIOSK_AUTOSTART"
