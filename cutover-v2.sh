@@ -13,7 +13,8 @@
 # "run" does, in order: back up (database, binaries, units, kiosk autostart); maintenance mode;
 # stop the services; deactivate V1; core's migration.sql; mark the import plugin's one-time
 # migrations done (production's addresses were already standardized, dkeen 2026-11-15, and
-# migration.sql's households replace the other, as in the rehearsal); delete the
+# migration.sql's households replace the other, as in the rehearsal); turn DoorKing's Send to
+# RAM off (on again by hand after the Legacy Keep, checklist step 3); delete the
 # retired DoorKing proxy's options; set FSBHOA_AC_ENVIRONMENT to production; link and activate
 # the V2 plugins; write the service configs from the settings; deploy-production.sh (installs
 # and starts the services); the OFFICE System entry (the Lodge office's directory listing); the
@@ -166,10 +167,12 @@ Left to do by hand (fsbhoa_ac_core other_docs/ARCHITECTURE.md, "To do before the
       sudo systemctl restart ${SERVICES[*]}
  2. Save the Event Service (with Enable Scheduled Sync on), Kiosk, Print Service and Vehicle
     settings pages, so their configs get the key.
- 3. DoorKing: check the settings (account, To_RAM_Production). On the DoorKing Legacy page,
-    upload the same RAM export ($(basename "${CSV:-the RAM export}")), check, and Keep with the default
-    ticks (not in the database + archived or purged): then every windshield tag and gate code RAM
-    has goes out.
+ 3. DoorKing: check the settings (account, To_RAM_Production). Send to RAM is OFF (this script
+    turned it off): leave it off until the Keep is done. On the DoorKing Legacy page, upload the
+    same RAM export ($(basename "${CSV:-the RAM export}")), check, and Keep with the default ticks
+    (not in the database + archived or purged). Then Check only again: no tag or gate code may be
+    listed as lost (directory codes "not sent" or "Assigned by RAM" are fine). Only then turn
+    Send to RAM on in the DoorKing settings.
  4. Vehicle lanes (ARCHITECTURE.md step 10): settings-import from the testbed's export (without
     the Workbench lane), the NVR password, ffmpeg and tools/install_front_plate.sh, the FTP
     server (lpr_ftp/setup.sh), the cameras' FTP target.
@@ -180,8 +183,10 @@ Left to do by hand (fsbhoa_ac_core other_docs/ARCHITECTURE.md, "To do before the
  7. Pages production doesn't have yet, in the main menu under Access Control as on the testbed:
     Vendor ([fsbhoa_vendor_management], slug vendor, after Cardholder; the print page links back
     to it) and Vehicle Log Reports ([fsbhoa_vehicle_report], slug vehicle-log).
- 8. RAM PC: dk_sync.ini for production, a Live_Production Disk File for each account; check
-    the first push reaches both North Gates and South Gates (fsbhoa_ac_doorking CLAUDE.md).
+ 8. RAM PC, after step 3: back up RAM (its only undo: a push replaces all its data); dk_sync.ini
+    for production (Environment=production, ExpectedHost, no Imports=0), a Live_Production Disk
+    File for each account; start DK_Sync; check the first push reaches both North Gates and
+    South Gates (fsbhoa_ac_doorking CLAUDE.md), then export RAM and Check only on the Legacy page.
  9. The kiosk screen: log out and in (or reboot) so the autostart runs the kiosk plugin's
     start_kiosk.sh.
 10. Watch wp-content/debug.log, the journal (journalctl -u 'fsbhoa_*') and Discord.
@@ -213,6 +218,12 @@ do_run() {
     wpv option update fsbhoa_ac_address_standardization_complete yes >/dev/null
     wpv option update fsbhoa_household_migration_completed 1 >/dev/null
     echo "   [OK] the import plugin's one-time migrations marked done"
+    # No export may reach RAM before the Legacy Keep (checklist step 3): one written before it
+    # leaves out every legacy value (241 windshield tags and 104 gate codes in the 2026-11-16
+    # rehearsal), and its trigger file waits in To_RAM_Production for the RAM PC's DK_Sync.
+    # Send to RAM is on by default, so turn it off; checklist step 3 turns it on again.
+    wpv option update fsbhoa_dk_send_to_ram 0 >/dev/null
+    echo "   [OK] DoorKing Send to RAM off (on again after the Legacy Keep, checklist step 3)"
     for o in fsbhoa_dk_proxy_port fsbhoa_dk_gate_ip fsbhoa_dk_controller_name; do wpv option delete "$o" >/dev/null || true; done
     if [ -f /etc/systemd/system/fsbhoa_doorking.service ]; then
         sudo systemctl disable --quiet fsbhoa_doorking || true
