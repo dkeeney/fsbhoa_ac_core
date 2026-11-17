@@ -190,7 +190,11 @@ Left to do by hand (fsbhoa_ac_core other_docs/ARCHITECTURE.md, "To do before the
  9. The kiosk screen: log out and in (or reboot) so the autostart runs the kiosk plugin's
     start_kiosk.sh.
 10. Watch wp-content/debug.log, the journal (journalctl -u 'fsbhoa_*') and Discord.
-Back to V1 if needed: $CORE/cutover-v2.sh rollback ${B:-<backup folder>}
+BACK TO V1 (the card "Back to V1"):
+  Vehicle gates wrong after a push to RAM:  ~/revert-ram-hold.sh, then restore the RAM backup
+                                            on the RAM PC and Send All Data (level 1)
+  Pedestrian gates, or anything else:       ~/revert-to-v1.sh  (level 2: V1, its database from
+                                            ${B:-<backup folder>}, and V1's card sync to the controllers)
 CHECK
 }
 
@@ -292,6 +296,9 @@ COMMIT;"
     fi
 
     wpv maintenance-mode deactivate >/dev/null || true
+    # The panic scripts, where they are easy to find (the card "Back to V1")
+    ln -sfn "$CORE/revert-ram-hold.sh" "$HOME/revert-ram-hold.sh"
+    ln -sfn "$CORE/revert-to-v1.sh" "$HOME/revert-to-v1.sh"
     say "V2 is running; maintenance mode off"
     checklist | tee "$B/CHECKLIST.txt"
 }
