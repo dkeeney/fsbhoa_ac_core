@@ -187,14 +187,25 @@ Left to do by hand (fsbhoa_ac_core other_docs/ARCHITECTURE.md, "To do before the
     for production (Environment=production, ExpectedHost, no Imports=0), a Live_Production Disk
     File for each account; start DK_Sync; check the first push reaches both North Gates and
     South Gates (fsbhoa_ac_doorking CLAUDE.md), then export RAM and Check only on the Legacy page.
- 9. The kiosk screen: log out and in (or reboot) so the autostart runs the kiosk plugin's
-    start_kiosk.sh.
+ 9. Lobby kiosk: since 2026-11-18 it is the Raspberry Pi 5 at 192.168.42.64 (ssh kiosk), not
+    this server's desktop (its autostart is off: leave it off). On the Kiosk Stations page,
+    register a station for 192.168.42.64 (Lobby). Then on the Pi:
+      sudo kiosk-mode writable          (reboots)
+      sudo nano /etc/fsbhoa-kiosk/kiosk.conf
+          KIOSK_URL="https://access.fsbhoa.com:8080/"   (drop ?auto_name=LobbyKiosk: V2
+          picks the station by IP address)
+      sudo kiosk-mode readonly          (reboots)
+    Check: sudo kiosk-watchdog --check says the page is connected, and a test swipe shows on
+    the monitor at the Lobby station (fsbhoa_ac_kiosk pi/README.md).
 10. Watch wp-content/debug.log, the journal (journalctl -u 'fsbhoa_*') and Discord.
 BACK TO V1 (the card "Back to V1"):
   Vehicle gates wrong after a push to RAM:  ~/revert-ram-hold.sh, then restore the RAM backup
                                             on the RAM PC and Send All Data (level 1)
   Pedestrian gates, or anything else:       ~/revert-to-v1.sh  (level 2: V1, its database from
                                             ${B:-<backup folder>}, and V1's card sync to the controllers)
+  After level 2, the lobby kiosk Pi:        ssh kiosk; sudo kiosk-mode writable; set KIOSK_URL back
+                                            to https://access.fsbhoa.com:8080/?auto_name=LobbyKiosk
+                                            in /etc/fsbhoa-kiosk/kiosk.conf; sudo kiosk-mode readonly
 CHECK
 }
 
