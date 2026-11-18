@@ -39,7 +39,7 @@ Afterwards: find the cause, then turn Send to RAM on in the DoorKing settings an
    It ends with `CARD SYNC: OK, N controller(s) loaded` (normally 4: South Gate, North Gate, Lodge A, Lodge B). It takes a few minutes.
 2. **Test** a badge at each pedestrian gate.
 3. If it says `CARD SYNC: PROBLEM`, V1 is back but not every controller was loaded. In V1, go to the sync page and press **Force Full Rebuild**.
-4. **Lobby kiosk** (the Raspberry Pi at the front desk): point it back at V1, or it shows an error screen. From the server: `ssh kiosk` (or `ssh pi@192.168.42.64`), then:
+4. **Lobby kiosk** (the Raspberry Pi at the front desk): point it back at V1, or it shows an error screen. From IT_PC, Boardroom or home (the server has no key to it): `ssh kiosk` (or `ssh pi@192.168.42.64`), then:
    - `sudo kiosk-mode writable` (it reboots; wait a minute and `ssh kiosk` again)
    - `sudo nano /etc/fsbhoa-kiosk/kiosk.conf` and set `KIOSK_URL="https://access.fsbhoa.com:8080/?auto_name=LobbyKiosk"`
    - `sudo kiosk-mode readonly` (it reboots). Test a swipe at the kiosk.
