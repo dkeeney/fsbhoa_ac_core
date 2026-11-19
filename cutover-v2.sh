@@ -203,9 +203,8 @@ BACK TO V1 (the card "Back to V1"):
                                             on the RAM PC and Send All Data (level 1)
   Pedestrian gates, or anything else:       ~/revert-to-v1.sh  (level 2: V1, its database from
                                             ${B:-<backup folder>}, and V1's card sync to the controllers)
-  After level 2, the lobby kiosk Pi:        ssh kiosk; sudo kiosk-mode writable; set KIOSK_URL back
-                                            to https://access.fsbhoa.com:8080/?auto_name=LobbyKiosk
-                                            in /etc/fsbhoa-kiosk/kiosk.conf; sudo kiosk-mode readonly
+  The lobby kiosk Pi:                       revert-to-v1.sh points it back at V1 itself (KIOSK: OK);
+                                            on KIOSK: PROBLEM, the card's level 2 step 4 by hand
 CHECK
 }
 

@@ -5,14 +5,17 @@
 #   2. asks once (y), unless --yes;
 #   3. cutover-v2.sh rollback: V1 and the database from before the cutover (anything recorded
 #      since is lost), V1's binaries and units, the kiosk autostart;
+#   3b. the lobby kiosk Pi (ssh kiosk, 192.168.42.64) back to V1's page (?auto_name=LobbyKiosk),
+#      without a reboot; a problem there is reported, not fatal. --no-kiosk skips it;
+#      --kiosk-only does only this (by hand, or to test it: no change if already on V1's page);
 #   4. V1's card sync to the door controllers (the UHPPOTE controllers keep V2's cards until V1
 #      syncs): V1's nightly sync, whose loader writes only the cards that differ (no wipe, no gap
 #      at the doors). --wipe instead wipes each controller and reloads it ("Force Full
 #      Rebuild"; cards don't work for about 15 seconds per controller). --no-sync skips it.
 #
-#   ~/revert-to-v1.sh [--yes] [--wipe | --no-sync] [--rehearsal]
+#   ~/revert-to-v1.sh [--yes] [--wipe | --no-sync] [--no-kiosk | --kiosk-only] [--rehearsal]
 #
-# --rehearsal: on the testbed (its own controllers only). The vehicle gates (RAM) are not
+# --rehearsal: on the testbed (its own controllers only; never the lobby kiosk). The vehicle gates (RAM) are not
 # touched: V1 never sends to RAM, so the panels keep what RAM has. If the vehicle gates are the
 # problem too, also do level 1 on the RAM PC (restore the RAM backup, Send All Data); see the
 # card "Back to V1".
@@ -23,17 +26,57 @@ set -uo pipefail
 CORE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 WP_DIR=/var/www/html
 LOG="$WP_DIR/wp-content/debug.log"
-YES=0; SYNC=nightly; REHEARSAL=()
+YES=0; SYNC=nightly; REHEARSAL=(); KIOSK=1; KIOSK_ONLY=0
+KIOSK_V1_URL="https://access.fsbhoa.com:8080/?auto_name=LobbyKiosk"
 for a in "$@"; do
     case "$a" in
         --yes) YES=1 ;;
         --wipe) SYNC=wipe ;;
         --no-sync) SYNC=none ;;
-        --rehearsal) REHEARSAL=(--rehearsal) ;;
-        *) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+        --rehearsal) REHEARSAL=(--rehearsal); KIOSK=0 ;;
+        --no-kiosk) KIOSK=0 ;;
+        --kiosk-only) KIOSK_ONLY=1 ;;
+        *) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
     esac
 done
 fail() { echo "STOPPED: $*"; exit 1; }
+
+# The lobby kiosk Pi: its SD card is read-only (overlay), so the setting is changed both live and
+# on the card underneath (/media/root-ro, unlocked for a few seconds), then the browser restarts.
+kiosk_to_v1() {
+    echo ""
+    echo "--- Lobby kiosk (ssh kiosk) back to V1's page ---"
+    if ssh -o BatchMode=yes -o ConnectTimeout=10 kiosk "bash -s -- '$KIOSK_V1_URL'" <<'REMOTE'
+set -e
+U="$1"; C=/etc/fsbhoa-kiosk/kiosk.conf; L=/media/root-ro$C
+want="KIOSK_URL=\"$U\""
+files=("$C"); mountpoint -q /media/root-ro && files+=("$L")
+todo=0; for f in "${files[@]}"; do grep -qxF "$want" "$f" || todo=1; done
+if [ "$todo" = 0 ]; then echo "   already on V1's page: no change"; exit 0; fi
+sudo sed -i "s|^KIOSK_URL=.*|$want|" "$C"
+if [ "${#files[@]}" = 2 ]; then
+    trap 'sudo mount -o remount,ro /media/root-ro' EXIT
+    sudo mount -o remount,rw /media/root-ro
+    sudo sed -i "s|^KIOSK_URL=.*|$want|" "$L"
+    sync
+fi
+for f in "${files[@]}"; do grep -qxF "$want" "$f" || { echo "   $f not changed"; exit 1; }; done
+sudo systemctl restart kiosk-browser
+echo "   KIOSK_URL set; browser restarted"
+for i in $(seq 1 12); do
+    sleep 5
+    sudo kiosk-watchdog --check 2>/dev/null | grep -q "page connected" && { echo "   page connected"; exit 0; }
+done
+echo "   page not connected after 60 s"; exit 1
+REMOTE
+    then
+        echo "KIOSK: OK"
+    else
+        echo "KIOSK: PROBLEM. By hand (card \"Back to V1\", level 2, step 4): ssh kiosk; sudo kiosk-mode writable;"
+        echo "       set $KIOSK_V1_URL as KIOSK_URL in /etc/fsbhoa-kiosk/kiosk.conf; sudo kiosk-mode readonly"
+    fi
+}
+if [ "$KIOSK_ONLY" = 1 ]; then kiosk_to_v1; exit 0; fi
 [ "$(id -u)" -ne 0 ] || fail "run this as the user the services run as, not as root"
 [ -x "$CORE/cutover-v2.sh" ] || fail "$CORE/cutover-v2.sh not found"
 
@@ -56,6 +99,7 @@ start=$(date +%s)
 "$CORE/cutover-v2.sh" rollback "$B" --yes "${REHEARSAL[@]}" || fail "the rollback stopped (see $B/rollback.log). Run it again, or: $CORE/cutover-v2.sh rollback $B"
 echo ""
 echo "--- Rollback done in $(( $(date +%s) - start )) s ---"
+[ "$KIOSK" = 1 ] && kiosk_to_v1
 
 if [ "$SYNC" = none ]; then
     echo "Card sync skipped (--no-sync). In V1: Access Control > sync page > Sync Now."
